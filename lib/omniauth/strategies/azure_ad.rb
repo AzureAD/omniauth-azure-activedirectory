@@ -1,3 +1,4 @@
+require 'adal'
 require 'jwt'
 require 'omniauth'
 require 'omniauth/azure_ad/jwt'
@@ -16,47 +17,47 @@ module OmniAuth
 
       extra { { session_state: @session_state } }
 
-      AUTHORIZE_ENDPOINT = 'https://login.windows.net/common/oauth2/authorize'
-      OIDC_RESPONSE_TYPE = 'id_token'
-      OIDC_RESPONSE_MODE = 'form_post'
-      OIDC_SCOPE = 'openid'
+      AUTH_CTX = ADAL::AuthenticationContext.new
+      DEFAULT_RESPONSE_TYPE = 'code id_token'
 
+      # This is called by OmniAuth.
       def request_phase
         redirect authorize_endpoint
       end
 
+      ##
+      # This is called by OmniAuth after the user enters credentials at the
+      # authorization endpoint. OmniAuth exposes a Rack::Request object in the
+      # global scope called `request`. The `request.params` field is a hash that
+      # contains the content of the posted form.
       def callback_phase
         error = request.params['error_reason'] || request.params['error']
-        build_access_token unless error
+        @claims = {}
+        parse_authorization_response unless error
         super
       end
 
-      def build_access_token
+      def parse_authorization_response
         @session_state = request.params['session_state']
         @claims, @header = JWT.decode(request.params['id_token'], nil, false)
+        @auth_code = request.params['code']
       end
 
+      # @return String
       def authorize_endpoint
-        "#{AUTHORIZE_ENDPOINT}?#{query_string}"
+        uri_string = AUTH_CTX.authorization_request_url(
+          options[:resource],
+          options[:client_id],
+          options[:redirect_uri] || callback_url,
+          nonce: options[:nonce] || SecureRandom.uuid,
+          response_type: options[:response_type] || DEFAULT_RESPONSE_TYPE).to_s
       end
 
       private
 
+      # @return String
       def callback_url
         full_host + script_name + callback_path
-      end
-
-      def query_params
-        { client_id: options[:client_id],
-          nonce: SecureRandom.uuid,
-          redirect_uri: options[:redirect_uri] || callback_url,
-          response_mode: options[:response_mode] || OIDC_RESPONSE_MODE,
-          response_type: options[:response_type] || OIDC_RESPONSE_TYPE,
-          scope: options[:scope] || OIDC_SCOPE }
-      end
-
-      def query_string
-        URI.encode(query_params.collect { |k, v| "#{k}=#{v}" }.join('&'))
       end
     end
   end

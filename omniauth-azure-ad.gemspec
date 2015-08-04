@@ -14,10 +14,11 @@ Gem::Specification.new do |s|
   s.files           = `git ls-files`.split("\n")
   s.require_paths   = ['lib']
 
-  s.add_runtime_dependency 'omniauth', '>= 1.1.1'
+  s.add_runtime_dependency 'adal', '~> 0.0'
+  s.add_runtime_dependency 'omniauth', '~> 1.1'
   s.add_runtime_dependency 'omniauth-oauth2', '~> 1.2'
   s.add_runtime_dependency 'multi_json', '~> 1.3'
 
-  s.add_development_dependency 'rspec', '>= 2.14.0'
-  s.add_development_dependency 'rake'
+  s.add_development_dependency 'rspec', '~> 3.3'
+  s.add_development_dependency 'rake', '~> 10.4'
 end
