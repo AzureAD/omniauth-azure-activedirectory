@@ -1,10 +1,6 @@
-require 'adal'
-require 'base64'
 require 'jwt'
 require 'omniauth'
-require 'omniauth/azure_ad/jwt'
 require 'openssl'
-require 'open-uri'
 
 module OmniAuth
   module Strategies
@@ -13,8 +9,10 @@ module OmniAuth
       include OmniAuth::AzureAD
       include OmniAuth::Strategy
 
-      AUTH_CTX = ADAL::AuthenticationContext.new
       DEFAULT_RESPONSE_TYPE = 'code id_token'
+      DEFAULT_RESPONSE_MODE = 'form_post'
+      DEFAULT_SIGNING_KEYS_URL =
+        'https://login.windows.net/common/discovery/keys'
 
       attr_reader :id_token
       attr_reader :session_state
@@ -22,7 +20,7 @@ module OmniAuth
       attr_reader :error
 
       # TODO(aj-michael) I don't think any of this is right.
-      uid { @claims[JWTClaim::SUBJECT] }
+      uid { @claims['sub'] }
       info { @claims }
       extra { { session_state: @session_state } }
 
@@ -42,11 +40,16 @@ module OmniAuth
         # TODO(aj-michael) Determine a better way to handle error responses.
         error = request.params['error']
         @claims = {}
-        parse_authorization_response unless error
-        @claims, @header = JWT.decode(@id_token, nil, false)
-        validate_id_token(id_token)
+        @session_state = request.params['session_state']
+        @id_token = request.params['id_token']
+        @code = request.params['code']
+        @claims, @header = validate_id_token(id_token)
         super
       end
+
+
+      private
+
 
       ##
       # Constructs a one-time-use authorize_endpoint. This method will use
@@ -54,48 +57,49 @@ module OmniAuth
       #
       # @return String
       def authorize_endpoint
-        AUTH_CTX.authorization_request_url(nil, # resource
-                                           client_id,
-                                           callback_url,
-                                           nonce: new_nonce,
-                                           response_type: response_type).to_s
+        uri = URI(openid_config['authorization_endpoint'])
+        uri.query = URI.encode_www_form(client_id: client_id,
+                                        redirect_uri: callback_url,
+                                        response_mode: response_mode,
+                                        response_type: response_type,
+                                        nonce: new_nonce)
+        uri.to_s
       end
 
       ##
-      # See OpenId Connect Core 3.1.3.7 and 3.2.2.11.
+      # Note that callback_url, full_host, script_name and query_string are
+      # methods defined on OmniAuth::Strategy.
       #
-      # 1. Validate the signature according to JWS using the `alg` header.
-      # 2. Check the nonce.
-      # 3. Verify the issuer matches. TODO(aj-michael) Determine where to find
-      #    the true issuer.
-      # 4. Validate the `aud` claim. If `aud` is a string, it must match the
-      #    client id. If it is an array, it must include the client id.
-      # 5. If `aud` contains multiple audiences, `azp` is required.
-      # 6. If `azp` is present, it must match client id.
-      # 7. Check the `exp` time.
-      # 8. Do I care about `iat`?
-      def validate_id_token(id_token)
-        keys = fetch_signing_keys
-        openid_config = fetch_openid_config
+      # TODO(aj-michael) This is probably wrong.
+      #
+      # @return String
+      def callback_url
+        options[:redirect_uri] || (full_host + script_name + callback_path)
+      end
 
-        puts "My nonce was #{read_nonce}."
+      ##
+      # The client id of the calling application. This must be configured where
+      # AzureAD is installed as an OmniAuth strategy.
+      #
+      # Example config.ru:
+      #
+      #    require 'omniauth-azure-ad'
+      #
+      #    use OmniAuth::Strategies::AzureAD,
+      #      client_id: '<insert client id here>'
+      #
+      # @return String
+      def client_id
+        return options[:client_id] if options.include? :client_id
+        fail StandardError, 'No client_id specified in AzureAD configuration.'
+      end
 
-        puts keys[0]
-        puts openid_config
-
-
-        # Decode the JWT without checking signature.
-        claims, header = JWT.decode(id_token, nil, false)
-
-        puts header
-        puts header['alg']
-
-        key = OpenSSL::PKey::RSA.new 2048
-        key.e = Base64.decode64(keys[0]['e'])
-        key.n = Base64.decode64(keys[0]['n'])
-
-        JWT.decode(id_token, key)
-
+      ##
+      # The expected id token issuer taken from the discovery endpoint.
+      #
+      # @return String
+      def issuer
+        openid_config['issuer']
       end
 
       ##
@@ -141,50 +145,20 @@ module OmniAuth
                              'AzureAD tenant.'
       end
 
-      private
-
-      ##
-      # Note that callback_url, full_host, script_name and query_string are
-      # methods defined on OmniAuth::Strategy.
-      #
-      # TODO(aj-michael) This is probably wrong.
-      #
-      # @return String
-      def callback_url
-        options[:redirect_uri] || (full_host + script_name + callback_path)
-      end
-
-      ##
-      # The client id of the calling application. This must be configured where
-      # AzureAD is installed as an OmniAuth strategy.
-      #
-      # Example config.ru:
-      #
-      #    require 'omniauth-azure-ad'
-      #
-      #    use OmniAuth::Strategies::AzureAD,
-      #      client_id: '<insert client id here>'
-      #
-      # @return String
-      def client_id
-        return options[:client_id] if options.include? :client_id
-        fail StandardError, 'No client_id specified in AzureAD configuration.'
-      end
-
-      ##
-      # TODO(aj-michael) Document this.
-      #
-      # @return String
-      def issuer
-        fetch_openid_config['issuer']
-      end
-
       ##
       # TODO(aj-michael) Document this.
       #
       # @return String
       def new_nonce
         session['omniauth-azure-ad.nonce'] = SecureRandom.uuid
+      end
+
+      ##
+      # A memoized version of #fetch_openid_config.
+      #
+      # @return Hash
+      def openid_config
+        @openid_config ||= fetch_openid_config
       end
 
       ##
@@ -208,28 +182,77 @@ module OmniAuth
       ##
       # TODO(aj-michael) Document this.
       #
-      def parse_authorization_response
-        @session_state = request.params['session_state']
-        @id_token = request.params['id_token']
-        @code = request.params['code']
-      end
-
-      ##
-      # TODO(aj-michael) Document this.
-      #
       # @return String
       def response_type
         options[:response_type] || DEFAULT_RESPONSE_TYPE
       end
 
       ##
-      # The location of the AzureAD public signing keys.
+      # TODO(aj-michael) Document this.
       #
-      # TODO(aj-michael) This should not be static.
+      # @return String
+      def response_mode
+        options[:response_mode] || DEFAULT_RESPONSE_MODE
+      end
+
+      ##
+      # TODO(aj-michael) Document this.
+      #
+      # @return TODO(aj-michael)
+      def signing_keys
+        @signing_keys ||= fetch_signing_keys
+      end
+
+      ##
+      # The location of the AzureAD public signing keys. In reality, this is
+      # static but since it could change in the future, we try and parse it from
+      # the discovery endpoint if possible.
       #
       # @return URI
       def signing_keys_url
-        URI('https://login.windows.net/common/discovery/keys')
+        if openid_config.include? 'jwks_uri'
+          URI(openid_config['jwks_uri'])
+        else
+          URI(DEFAULT_SIGNING_KEYS_URL)
+        end
+      end
+
+      ##
+      # Verifies the signature of the id token as well as the exp, nbf, iat,
+      # iss, and aud fields.
+      #
+      # See OpenId Connect Core 3.1.3.7 and 3.2.2.11.
+      #
+      # return Claims, Header
+      def validate_id_token(id_token)
+        keys = fetch_signing_keys
+
+        verify_options = {
+          verify_expiration: true,
+          verify_not_before: true,
+          verify_iat: true,
+          verify_iss: true,
+          'iss' => issuer,
+          verify_aud: true,
+          'aud' => client_id
+        }
+
+        # The second parameter is the public key to verify the signature.
+        # However, that key is overridden by the value of the executed block
+        # if one is present.
+        claims, header =
+          JWT.decode(id_token, nil, true, verify_options) do |header|
+            # There should always be one key from the discovery endpoint that
+            # matches the id in the JWT header.
+            x5c = keys.select do |key|
+              key['kid'] == header['kid']
+            end.first['x5c'].first
+            # The key also contains other fields, such as n and e, that are
+            # redundant. x5c is sufficient to verify the id token.
+            OpenSSL::X509::Certificate.new(JWT.base64url_decode(x5c)).public_key
+          end
+        return claims, header if claims['nonce'] == read_nonce
+        fail JWT::DecodeError, 'Returned nonce did not match.'
       end
     end
   end
