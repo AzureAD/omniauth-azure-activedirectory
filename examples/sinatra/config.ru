@@ -15,7 +15,7 @@ use Rack::Session::Cookie, secret: 'top secret'
 
 use OmniAuth::Builder do
   provider :amazon, ENV['AMAZON_KEY'], ENV['AMAZON_SECRET']
-  provider :azuread, client_id: ENV['AAD_KEY'], tenant: ENV['AAD_TENANT']
+  provider :azuread, ENV['AAD_KEY'], ENV['AAD_TENANT']
   provider :github, ENV['GITHUB_KEY'], ENV['GITHUB_SECRET']
   provider :google_oauth2, ENV['GOOGLE_KEY'], ENV['GOOGLE_SECRET']
 end

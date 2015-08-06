@@ -12,6 +12,21 @@ module OmniAuth
 
       class OAuthError < StandardError; end
 
+      ##
+      # The client id (key) and tenant must be configured when the OmniAuth
+      # middleware is installed. Example:
+      #
+      #    require 'omniauth'
+      #    require 'omniauth-azure-ad'
+      #
+      #    use OmniAuth::Builder do
+      #      provider :azuread, ENV['AAD_KEY'], ENV['AAD_TENANT']
+      #    end
+      #
+      args [:client_id, :tenant]
+      option :client_id, nil
+      option :tenant, nil
+
       # Field renaming is an attempt to fit the OmniAuth recommended schema as
       # best as possible.
       #
@@ -79,16 +94,9 @@ module OmniAuth
       # The client id of the calling application. This must be configured where
       # AzureAD is installed as an OmniAuth strategy.
       #
-      # Example config.ru:
-      #
-      #    require 'omniauth-azure-ad'
-      #
-      #    use OmniAuth::Strategies::AzureAD,
-      #      client_id: '<insert client id here>'
-      #
       # @return String
       def client_id
-        return options[:client_id] if options.include? :client_id
+        return options.client_id if options.client_id
         fail StandardError, 'No client_id specified in AzureAD configuration.'
       end
 
@@ -227,7 +235,7 @@ module OmniAuth
       #
       # @return String
       def tenant
-        return options[:tenant] if options.include? :tenant
+        return options.tenant if options.tenant
         fail StandardError, 'No tenant specified in AzureAD configuration.'
       end
 
