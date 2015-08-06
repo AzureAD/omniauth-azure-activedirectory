@@ -262,11 +262,14 @@ module OmniAuth
       #
       # See OpenId Connect Core 3.1.3.7 and 3.2.2.11.
       #
-      # return Claims, Header
+      # @return Claims, Header
       def validate_id_token(id_token)
         # The second parameter is the public key to verify the signature.
         # However, that key is overridden by the value of the executed block
         # if one is present.
+        #
+        # If you're thinking that this looks ugly with the raw nil and boolean,
+        # see https://github.com/jwt/ruby-jwt/issues/59.
         claims, header =
           JWT.decode(id_token, nil, true, verify_options) do |header|
             # There should always be one key from the discovery endpoint that
