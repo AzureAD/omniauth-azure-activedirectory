@@ -1,7 +1,7 @@
 require 'spec_helper'
 require 'omniauth-azure-ad'
 
-describe OmniAuth::Strategies::AzureAD do
+describe OmniAuth::Strategies::AzureActiveDirectory do
   let(:app) { -> { [200, {}, ['Hello world.']] } }
   let(:id_token) { 'id_token' }
   let(:request) { double('Request', params: { 'id_token' => id_token }) }
