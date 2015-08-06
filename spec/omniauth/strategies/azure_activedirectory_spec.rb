@@ -16,7 +16,7 @@
 #-------------------------------------------------------------------------------
 
 require 'spec_helper'
-require 'omniauth-azure-ad'
+require 'omniauth-azure-activedirectory'
 
 describe OmniAuth::Strategies::AzureActiveDirectory do
   let(:app) { -> { [200, {}, ['Hello world.']] } }
