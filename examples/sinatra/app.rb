@@ -8,19 +8,22 @@ get '/' do
   content_type 'text/html'
   <<-HTML
     <h3>Hello there!</h3>
+    <a href='/auth/amazon'>Sign in with Amazon</a>
     <a href='/auth/azuread'>Sign in with AzureAD</a>
+    <a href='/auth/github'>Sign in with Github</a>
+    <a href='/auth/google_oauth2'>Sign in with Google</a>
   HTML
 end
 
-get '/secure_endpoint' do
-  redirect '/auth/azure_ad'
+%w(get post).each do |method|
+  send(method, '/auth/:provider/callback') do
+    auth = request.env['omniauth.auth']
+    "Your authentication looks like #{JSON.unparse(auth)}."
+  end
 end
 
-post '/auth/:provider/callback' do
-  auth = request.env['omniauth.auth']
-  "Your authentication looks like #{JSON.unparse(auth)}."
-end
-
-get '/auth/:provider/failure' do
-  "Aw shucks, we couldn't verify your identity!"
+%w(get post).each do |method|
+  send(method, '/auth/:provider/failure') do
+    "Aw shucks, we couldn't verify your identity!"
+  end
 end

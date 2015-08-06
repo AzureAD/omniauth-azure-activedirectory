@@ -1,4 +1,8 @@
 source 'https://rubygems.org'
 
+gem 'dotenv'
 gem 'sinatra'
+gem 'omniauth-amazon'
 gem 'omniauth-azure-ad', path: '../../'
+gem 'omniauth-github'
+gem 'omniauth-google-oauth2'
