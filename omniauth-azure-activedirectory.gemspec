@@ -4,12 +4,12 @@ require 'omniauth/azure_activedirectory/version'
 Gem::Specification.new do |s|
   s.name            = 'omniauth-azure-activedirectory'
   s.version         = OmniAuth::AzureActiveDirectory::VERSION
-  s.authors         = ['Adam Michael']
-  s.email           = ['adam@ajmichael.net']
+  s.author          = 'Microsoft Open Technologies Inc'
+  s.email           = 'msopentech@microsoft.com'
   s.summary         = 'Azure Active Directory strategy for OmniAuth'
   s.description     = 'Azure Active Directory strategy for OmniAuth'
   s.homepage        = 'https://github.com/AzureAD/omniauth-azure-activedirectory'
-  s.license         = 'MIT'
+  s.license         = 'Apache 2.0'
 
   s.files           = `git ls-files`.split("\n")
   s.require_paths   = ['lib']
