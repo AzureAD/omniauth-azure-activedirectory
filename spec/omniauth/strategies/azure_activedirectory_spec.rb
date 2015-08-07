@@ -35,6 +35,7 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
   let(:name) { 'John Smith' }
   let(:nonce) { 'my nonce' }
   let(:session_state) { 'session state' }
+  let(:auth_endpoint_host) { 'authorize.com' }
 
   let(:hybrid_flow_params) do
     { 'id_token' => id_token,
@@ -43,7 +44,7 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
   end
 
   let(:tenant) { 'tenant' }
-  let(:openid_config_response) { "{\"issuer\":\"#{issuer}\",\"authorization_endpoint\":\"http://authorize.com/\"}" }
+  let(:openid_config_response) { "{\"issuer\":\"#{issuer}\",\"authorization_endpoint\":\"http://#{auth_endpoint_host}\"}" }
   let(:keys_response) { "{\"keys\":[{\"kid\":\"#{kid}\",\"x5c\":[\"#{x5c}\"]}]}" }
 
   let(:env) { { 'rack.session' => { 'omniauth-azure-activedirectory.nonce' => nonce } } }
@@ -144,6 +145,20 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       let(:x5c) { File.read(File.expand_path('../../../fixtures/x5c_different.txt', __FILE__)) }
       let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token.txt', __FILE__)) }
       it { is_expected.to raise_error JWT::VerificationError }
+    end
+  end
+
+  describe '#request_phase' do
+    let(:strategy) { described_class.new(app, client_id, tenant) }
+    subject { strategy.request_phase }
+    before(:each) { strategy.call!(env) }
+
+    it 'should make a redirect' do
+      expect(subject.first).to eq 302
+    end
+
+    it 'should redirect to the correct endpoint' do
+      expect(URI(subject[1]['Location']).host).to eq auth_endpoint_host
     end
   end
 end
