@@ -22,27 +22,9 @@ require 'omniauth-azure-activedirectory'
 # the state of the request. Especially large strings are stored in fixtures.
 describe OmniAuth::Strategies::AzureActiveDirectory do
   let(:app) { -> _ { [200, {}, ['Hello world.']] } }
-
-  ##
-  # I encoded this manually. It was super fun.
-  #
-  # payload:
-  #   { 'iss' => 'https://sts.windows.net/bunch-of-random-chars',
-  #     'name' => 'John Smith',
-  #     'aud' => 'the client id',
-  #     'nonce' => 'my nonce',
-  #     'email' => 'jsmith@contoso.com',
-  #     'given_name' => 'John',
-  #     'family_name' => 'Smith' }
-  # headers:
-  #   { 'typ' => 'JWT',
-  #     'alg' => 'RS256',
-  #     'kid' => 'abc123' }
-  #
-  let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token.txt', __FILE__)) }
   let(:x5c) { File.read(File.expand_path('../../../fixtures/x5c.txt', __FILE__)) }
 
-  # These values were used to create the id_token JWT>
+  # These values were used to create the "successful" id_token JWT.
   let(:client_id) { 'the client id' }
   let(:code) { 'code' }
   let(:email) { 'jsmith@contoso.com' }
@@ -53,6 +35,7 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
   let(:name) { 'John Smith' }
   let(:nonce) { 'my nonce' }
   let(:session_state) { 'session state' }
+  let(:auth_endpoint_host) { 'authorize.com' }
 
   let(:hybrid_flow_params) do
     { 'id_token' => id_token,
@@ -61,7 +44,7 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
   end
 
   let(:tenant) { 'tenant' }
-  let(:openid_config_response) { "{\"issuer\":\"#{issuer}\",\"authorization_endpoint\":\"http://authorize.com/\"}" }
+  let(:openid_config_response) { "{\"issuer\":\"#{issuer}\",\"authorization_endpoint\":\"http://#{auth_endpoint_host}\"}" }
   let(:keys_response) { "{\"keys\":[{\"kid\":\"#{kid}\",\"x5c\":[\"#{x5c}\"]}]}" }
 
   let(:env) { { 'rack.session' => { 'omniauth-azure-activedirectory.nonce' => nonce } } }
@@ -81,10 +64,24 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       end
     end
 
+    subject { -> { strategy.callback_phase } }
     before(:each) { strategy.call!(env) }
 
     context 'with a successful response' do
-      subject { -> { strategy.callback_phase } }
+      # payload:
+      #   { 'iss' => 'https://sts.windows.net/bunch-of-random-chars',
+      #     'name' => 'John Smith',
+      #     'aud' => 'the client id',
+      #     'nonce' => 'my nonce',
+      #     'email' => 'jsmith@contoso.com',
+      #     'given_name' => 'John',
+      #     'family_name' => 'Smith' }
+      # headers:
+      #   { 'typ' => 'JWT',
+      #     'alg' => 'RS256',
+      #     'kid' => 'abc123' }
+      #
+      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token.txt', __FILE__)) }
 
       # If it passes this test, then the id was successfully validated.
       it { is_expected.to_not raise_error }
@@ -118,6 +115,50 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
           expect(subject.extra['session_state']).to eq session_state
         end
       end
+    end
+
+    context 'with an invalid issuer' do
+      # payload:
+      #   { 'iss' => 'https://sts.imposter.net/bunch-of-random-chars', ... }
+      #
+      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_issuer.txt', __FILE__)) }
+      it { is_expected.to raise_error JWT::InvalidIssuerError }
+    end
+
+    context 'with an invalid audience' do
+      # payload:
+      #   { 'aud' => 'not the client id', ... }
+      #
+      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_audience.txt', __FILE__)) }
+      it { is_expected.to raise_error JWT::InvalidAudError }
+    end
+
+    context 'with a non-matching nonce' do
+      # payload:
+      #   { 'nonce' => 'not my nonce', ... }
+      #
+      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_nonce.txt', __FILE__)) }
+      it { is_expected.to raise_error JWT::DecodeError }
+    end
+
+    context 'with the wrong x5c' do
+      let(:x5c) { File.read(File.expand_path('../../../fixtures/x5c_different.txt', __FILE__)) }
+      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token.txt', __FILE__)) }
+      it { is_expected.to raise_error JWT::VerificationError }
+    end
+  end
+
+  describe '#request_phase' do
+    let(:strategy) { described_class.new(app, client_id, tenant) }
+    subject { strategy.request_phase }
+    before(:each) { strategy.call!(env) }
+
+    it 'should make a redirect' do
+      expect(subject.first).to eq 302
+    end
+
+    it 'should redirect to the correct endpoint' do
+      expect(URI(subject[1]['Location']).host).to eq auth_endpoint_host
     end
   end
 end
