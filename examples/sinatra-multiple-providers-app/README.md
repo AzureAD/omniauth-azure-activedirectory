@@ -1,4 +1,4 @@
-This examples shows how OmniAuth can be used with many different providers, including AzureAD.
+This example shows how OmniAuth can be used with many different providers, including AzureAD.
 
 Before running this sample, you should install the dependencies with:
 
