@@ -16,6 +16,12 @@
 #-------------------------------------------------------------------------------
 
 require 'webmock/rspec'
+require 'simplecov'
+
+SimpleCov.start do
+  # Don't measure coverage on test files.
+  add_filter 'spec'
+end
 
 WebMock.disable_net_connect!(allow_localhost: true)
 
