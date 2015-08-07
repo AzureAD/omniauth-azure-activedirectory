@@ -200,7 +200,7 @@ module OmniAuth
       #
       # @return String
       def read_nonce
-        session.delete('omniauth-azure-ad.nonce')
+        session.delete('omniauth-azure-activedirectory.nonce')
       end
 
       ##
@@ -270,7 +270,7 @@ module OmniAuth
         #
         # If you're thinking that this looks ugly with the raw nil and boolean,
         # see https://github.com/jwt/ruby-jwt/issues/59.
-        claims, header =
+        jwt_claims, jwt_header =
           JWT.decode(id_token, nil, true, verify_options) do |header|
             # There should always be one key from the discovery endpoint that
             # matches the id in the JWT header.
@@ -281,7 +281,7 @@ module OmniAuth
             # redundant. x5c is sufficient to verify the id token.
             OpenSSL::X509::Certificate.new(JWT.base64url_decode(x5c)).public_key
           end
-        return claims, header if claims['nonce'] == read_nonce
+        return jwt_claims, jwt_header if jwt_claims['nonce'] == read_nonce
         fail JWT::DecodeError, 'Returned nonce did not match.'
       end
 
