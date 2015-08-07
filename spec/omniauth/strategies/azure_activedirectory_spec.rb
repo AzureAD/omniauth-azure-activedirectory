@@ -63,6 +63,7 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       end
     end
 
+    subject { -> { strategy.callback_phase } }
     before(:each) { strategy.call!(env) }
 
     context 'with a successful response' do
@@ -80,7 +81,6 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       #     'kid' => 'abc123' }
       #
       let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token.txt', __FILE__)) }
-      subject { -> { strategy.callback_phase } }
 
       # If it passes this test, then the id was successfully validated.
       it { is_expected.to_not raise_error }
@@ -121,7 +121,6 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       #   { 'iss' => 'https://sts.imposter.net/bunch-of-random-chars', ... }
       #
       let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_issuer.txt', __FILE__)) }
-      subject { -> { strategy.callback_phase } }
       it { is_expected.to raise_error JWT::InvalidIssuerError }
     end
 
@@ -130,7 +129,6 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       #   { 'aud' => 'not the client id', ... }
       #
       let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_audience.txt', __FILE__)) }
-      subject { -> { strategy.callback_phase } }
       it { is_expected.to raise_error JWT::InvalidAudError }
     end
 
@@ -139,8 +137,13 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       #   { 'nonce' => 'not my nonce', ... }
       #
       let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_nonce.txt', __FILE__)) }
-      subject { -> { strategy.callback_phase } }
       it { is_expected.to raise_error JWT::DecodeError }
+    end
+
+    context 'with the wrong x5c' do
+      let(:x5c) { File.read(File.expand_path('../../../fixtures/x5c_different.txt', __FILE__)) }
+      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token.txt', __FILE__)) }
+      it { is_expected.to raise_error JWT::VerificationError }
     end
   end
 end
