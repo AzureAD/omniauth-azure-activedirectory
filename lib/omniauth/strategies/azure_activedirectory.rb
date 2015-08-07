@@ -86,7 +86,7 @@ module OmniAuth
         @session_state = request.params['session_state']
         @id_token = request.params['id_token']
         @code = request.params['code']
-        @claims, @header = validate_id_token(@id_token)
+        @claims, @header = validate_and_parse_id_token(@id_token)
         super
       end
 
@@ -263,7 +263,7 @@ module OmniAuth
       # See OpenId Connect Core 3.1.3.7 and 3.2.2.11.
       #
       # @return Claims, Header
-      def validate_id_token(id_token)
+      def validate_and_parse_id_token(id_token)
         # The second parameter is the public key to verify the signature.
         # However, that key is overridden by the value of the executed block
         # if one is present.
@@ -289,7 +289,7 @@ module OmniAuth
       # The options passed to the Ruby JWT library to verify the id token.
       # Note that these are not all the checks we perform. Some (like nonce)
       # are not handled by the JWT API and are checked manually in
-      # #validate_id_token.
+      # #validate_and_parse_id_token.
       #
       # @return Hash
       def verify_options
