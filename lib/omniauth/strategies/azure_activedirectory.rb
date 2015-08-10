@@ -292,6 +292,7 @@ module OmniAuth
       # @param Hash claims
       # @param Hash header
       def validate_chash(code, claims, header)
+        # This maps RS256 -> sha256, ES384 -> sha384, etc.
         algorithm = (header['alg'] || 'RS256').sub(/RS|ES|HS/, 'sha')
         full_hash = OpenSSL::Digest.new(algorithm).digest code
         c_hash = JWT.base64url_encode full_hash[0..full_hash.length / 2 - 1]
