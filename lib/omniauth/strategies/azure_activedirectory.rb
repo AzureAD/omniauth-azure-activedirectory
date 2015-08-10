@@ -85,6 +85,7 @@ module OmniAuth
         @id_token = request.params['id_token']
         @code = request.params['code']
         @claims, @header = validate_and_parse_id_token(@id_token)
+        validate_chash(@code, @claims, @header)
         super
       end
 
@@ -277,6 +278,21 @@ module OmniAuth
           end
         return jwt_claims, jwt_header if jwt_claims['nonce'] == read_nonce
         fail JWT::DecodeError, 'Returned nonce did not match.'
+      end
+
+      ##
+      # Verifies that the c_hash the id token claims matches the authorization
+      # code. See OpenId Connect Core 3.3.2.11.
+      #
+      # @param String code
+      # @param Hash claims
+      # @param Hash header
+      def validate_chash(code, claims, header)
+        algorithm = header['alg'].sub(/RS|ES|HS/, 'sha')
+        full_hash = OpenSSL::Digest.new(algorithm).digest code
+        c_hash = JWT.base64url_encode full_hash[0..full_hash.length/2-1]
+        return if c_hash == claims['c_hash']
+        fail JWT::VerificationError, 'c_hash in id token does not match auth code.'
       end
 
       ##
