@@ -151,6 +151,11 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_chash.txt', __FILE__)) }
       it { is_expected.to raise_error JWT::VerificationError }
     end
+
+    context 'with a non-matching kid' do
+      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_kid.txt', __FILE__)) }
+      it { is_expected.to raise_error JWT::VerificationError }
+    end
   end
 
   describe '#request_phase' do

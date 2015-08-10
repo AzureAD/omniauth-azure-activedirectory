@@ -269,12 +269,16 @@ module OmniAuth
           JWT.decode(id_token, nil, true, verify_options) do |header|
             # There should always be one key from the discovery endpoint that
             # matches the id in the JWT header.
-            x5c = signing_keys.find do |key|
+            x5c = (signing_keys.find do |key|
               key['kid'] == header['kid']
-            end['x5c'].first
+            end || {})['x5c']
+            if x5c.nil? || x5c.empty?
+              fail JWT::VerificationError,
+                   'No keys from key endpoint match the id token'
+            end
             # The key also contains other fields, such as n and e, that are
             # redundant. x5c is sufficient to verify the id token.
-            OpenSSL::X509::Certificate.new(JWT.base64url_decode(x5c)).public_key
+            OpenSSL::X509::Certificate.new(JWT.base64url_decode(x5c.first)).public_key
           end
         return jwt_claims, jwt_header if jwt_claims['nonce'] == read_nonce
         fail JWT::DecodeError, 'Returned nonce did not match.'
@@ -290,9 +294,10 @@ module OmniAuth
       def validate_chash(code, claims, header)
         algorithm = header['alg'].sub(/RS|ES|HS/, 'sha')
         full_hash = OpenSSL::Digest.new(algorithm).digest code
-        c_hash = JWT.base64url_encode full_hash[0..full_hash.length/2-1]
+        c_hash = JWT.base64url_encode full_hash[0..full_hash.length / 2 - 1]
         return if c_hash == claims['c_hash']
-        fail JWT::VerificationError, 'c_hash in id token does not match auth code.'
+        fail JWT::VerificationError,
+             'c_hash in id token does not match auth code.'
       end
 
       ##
