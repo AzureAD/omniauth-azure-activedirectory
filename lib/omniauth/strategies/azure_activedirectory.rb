@@ -66,8 +66,6 @@ module OmniAuth
 
       DEFAULT_RESPONSE_TYPE = 'code id_token'
       DEFAULT_RESPONSE_MODE = 'form_post'
-      DEFAULT_SIGNING_KEYS_URL =
-        'https://login.windows.net/common/discovery/keys'
 
       ##
       # Overridden method from OmniAuth::Strategy. This is the first step in the
@@ -233,17 +231,13 @@ module OmniAuth
       end
 
       ##
-      # The location of the AzureAD public signing keys. In reality, this is
-      # static but since it could change in the future, we try and parse it from
-      # the discovery endpoint if possible.
+      # The location of the public keys of the token signer. This is parsed from
+      # the OpenId config response.
       #
       # @return String
       def signing_keys_url
-        if openid_config.include? 'jwks_uri'
-          openid_config['jwks_uri']
-        else
-          DEFAULT_SIGNING_KEYS_URL
-        end
+        return openid_config['jwks_uri'] if openid_config.include? 'jwks_uri'
+        fail StandardError, 'No jwks_uri in OpenId config response.'
       end
 
       ##
