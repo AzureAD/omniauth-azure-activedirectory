@@ -156,6 +156,23 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_kid.txt', __FILE__)) }
       it { is_expected.to raise_error JWT::VerificationError }
     end
+
+    context 'with no alg header' do
+      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_no_alg.txt', __FILE__)) }
+
+      it 'should correctly parse using default RS256' do
+        expect(subject).to_not raise_error
+      end
+
+      describe 'the auth hash' do
+        subject { env['omniauth.auth'] }
+        before(:each) { strategy.callback_phase }
+
+        it 'should default to RS256' do
+          expect(subject.info['name']).to eq name
+        end
+      end
+    end
   end
 
   describe '#request_phase' do
