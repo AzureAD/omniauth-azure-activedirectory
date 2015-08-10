@@ -34,10 +34,10 @@ module OmniAuth
       # middleware is installed. Example:
       #
       #    require 'omniauth'
-      #    require 'omniauth-azure-ad'
+      #    require 'omniauth-azure-activedirectory'
       #
       #    use OmniAuth::Builder do
-      #      provider :azuread, ENV['AAD_KEY'], ENV['AAD_TENANT']
+      #      provider :azure_activedirectory, ENV['AAD_KEY'], ENV['AAD_TENANT']
       #    end
       #
       args [:client_id, :tenant]
@@ -175,7 +175,7 @@ module OmniAuth
       #
       # @return String
       def new_nonce
-        session['omniauth-azure-ad.nonce'] = SecureRandom.uuid
+        session['omniauth-azure-activedirectory.nonce'] = SecureRandom.uuid
       end
 
       ##

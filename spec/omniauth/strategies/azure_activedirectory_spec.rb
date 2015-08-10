@@ -44,7 +44,7 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
   end
 
   let(:tenant) { 'tenant' }
-  let(:openid_config_response) { "{\"issuer\":\"#{issuer}\",\"authorization_endpoint\":\"http://#{auth_endpoint_host}\"}" }
+  let(:openid_config_response) { "{\"issuer\":\"#{issuer}\",\"authorization_endpoint\":\"http://#{auth_endpoint_host}\",\"jwks_uri\":\"https://login.windows.net/common/discovery/keys\"}" }
   let(:keys_response) { "{\"keys\":[{\"kid\":\"#{kid}\",\"x5c\":[\"#{x5c}\"]}]}" }
 
   let(:env) { { 'rack.session' => { 'omniauth-azure-activedirectory.nonce' => nonce } } }
@@ -159,6 +159,32 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
 
     it 'should redirect to the correct endpoint' do
       expect(URI(subject[1]['Location']).host).to eq auth_endpoint_host
+    end
+  end
+
+  describe '#read_nonce' do
+    let(:strategy) { described_class.new(app, client_id, tenant) }
+    let(:env) { { 'rack.session' => {} } }
+    before(:each) { strategy.call!(env) }
+    subject { strategy.send(:read_nonce) }
+
+    context 'before a nonce is set' do
+      it { is_expected.to be nil }
+    end
+
+    context 'after a nonce is set' do
+      before(:each) { @nonce = strategy.send(:new_nonce) }
+      it 'should match' do
+        expect(subject).to eq @nonce
+      end
+    end
+
+    context 'twice in a row' do
+      before(:each) do
+        strategy.send(:new_nonce)
+        strategy.send(:read_nonce)
+      end
+      it { is_expected.to be nil }
     end
   end
 end
