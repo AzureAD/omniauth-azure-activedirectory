@@ -1,0 +1,30 @@
+source 'https://rubygems.org'
+
+gem 'rails', '4.2.1'
+
+# Stores the todo list.
+gem 'sqlite3'
+
+# Templating library for views.
+gem 'haml'
+
+# Rack middleware authentication framework.
+gem 'omniauth'
+
+# AzureAD specific strategy for OmniAuth.
+gem 'omniauth-azure-activedirectory'
+
+# Loads configurations from .env into ENV hash.
+gem 'dotenv'
+
+# Acquires access tokens for resources.
+gem 'adal'
+
+# For the front end.
+gem 'sass-rails', '~> 5.0'
+gem 'uglifier', '>= 1.3.0'
+gem 'coffee-rails', '~> 4.1.0'
+gem 'jquery-rails'
+gem 'jbuilder', '~> 2.0'
+gem 'sdoc', '~> 0.4.0', group: :doc
+gem 'turbolinks'
