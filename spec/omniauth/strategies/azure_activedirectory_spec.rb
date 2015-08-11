@@ -44,7 +44,7 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
   end
 
   let(:tenant) { 'tenant' }
-  let(:openid_config_response) { "{\"issuer\":\"#{issuer}\",\"authorization_endpoint\":\"http://#{auth_endpoint_host}\"}" }
+  let(:openid_config_response) { "{\"issuer\":\"#{issuer}\",\"authorization_endpoint\":\"http://#{auth_endpoint_host}\",\"jwks_uri\":\"https://login.windows.net/common/discovery/keys\"}" }
   let(:keys_response) { "{\"keys\":[{\"kid\":\"#{kid}\",\"x5c\":[\"#{x5c}\"]}]}" }
 
   let(:env) { { 'rack.session' => { 'omniauth-azure-activedirectory.nonce' => nonce } } }
@@ -146,6 +146,33 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token.txt', __FILE__)) }
       it { is_expected.to raise_error JWT::VerificationError }
     end
+
+    context 'with a non-matching c_hash' do
+      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_chash.txt', __FILE__)) }
+      it { is_expected.to raise_error JWT::VerificationError }
+    end
+
+    context 'with a non-matching kid' do
+      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_kid.txt', __FILE__)) }
+      it { is_expected.to raise_error JWT::VerificationError }
+    end
+
+    context 'with no alg header' do
+      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_no_alg.txt', __FILE__)) }
+
+      it 'should correctly parse using default RS256' do
+        expect(subject).to_not raise_error
+      end
+
+      describe 'the auth hash' do
+        subject { env['omniauth.auth'] }
+        before(:each) { strategy.callback_phase }
+
+        it 'should default to RS256' do
+          expect(subject.info['name']).to eq name
+        end
+      end
+    end
   end
 
   describe '#request_phase' do
@@ -159,6 +186,32 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
 
     it 'should redirect to the correct endpoint' do
       expect(URI(subject[1]['Location']).host).to eq auth_endpoint_host
+    end
+  end
+
+  describe '#read_nonce' do
+    let(:strategy) { described_class.new(app, client_id, tenant) }
+    let(:env) { { 'rack.session' => {} } }
+    before(:each) { strategy.call!(env) }
+    subject { strategy.send(:read_nonce) }
+
+    context 'before a nonce is set' do
+      it { is_expected.to be nil }
+    end
+
+    context 'after a nonce is set' do
+      before(:each) { @nonce = strategy.send(:new_nonce) }
+      it 'should match' do
+        expect(subject).to eq @nonce
+      end
+    end
+
+    context 'twice in a row' do
+      before(:each) do
+        strategy.send(:new_nonce)
+        strategy.send(:read_nonce)
+      end
+      it { is_expected.to be nil }
     end
   end
 end

@@ -34,10 +34,10 @@ module OmniAuth
       # middleware is installed. Example:
       #
       #    require 'omniauth'
-      #    require 'omniauth-azure-ad'
+      #    require 'omniauth-azure-activedirectory'
       #
       #    use OmniAuth::Builder do
-      #      provider :azuread, ENV['AAD_KEY'], ENV['AAD_TENANT']
+      #      provider :azure_activedirectory, ENV['AAD_KEY'], ENV['AAD_TENANT']
       #    end
       #
       args [:client_id, :tenant]
@@ -66,8 +66,6 @@ module OmniAuth
 
       DEFAULT_RESPONSE_TYPE = 'code id_token'
       DEFAULT_RESPONSE_MODE = 'form_post'
-      DEFAULT_SIGNING_KEYS_URL =
-        'https://login.windows.net/common/discovery/keys'
 
       ##
       # Overridden method from OmniAuth::Strategy. This is the first step in the
@@ -87,6 +85,7 @@ module OmniAuth
         @id_token = request.params['id_token']
         @code = request.params['code']
         @claims, @header = validate_and_parse_id_token(@id_token)
+        validate_chash(@code, @claims, @header)
         super
       end
 
@@ -175,7 +174,7 @@ module OmniAuth
       #
       # @return String
       def new_nonce
-        session['omniauth-azure-ad.nonce'] = SecureRandom.uuid
+        session['omniauth-azure-activedirectory.nonce'] = SecureRandom.uuid
       end
 
       ##
@@ -233,17 +232,13 @@ module OmniAuth
       end
 
       ##
-      # The location of the AzureAD public signing keys. In reality, this is
-      # static but since it could change in the future, we try and parse it from
-      # the discovery endpoint if possible.
+      # The location of the public keys of the token signer. This is parsed from
+      # the OpenId config response.
       #
       # @return String
       def signing_keys_url
-        if openid_config.include? 'jwks_uri'
-          openid_config['jwks_uri']
-        else
-          DEFAULT_SIGNING_KEYS_URL
-        end
+        return openid_config['jwks_uri'] if openid_config.include? 'jwks_uri'
+        fail StandardError, 'No jwks_uri in OpenId config response.'
       end
 
       ##
@@ -274,15 +269,36 @@ module OmniAuth
           JWT.decode(id_token, nil, true, verify_options) do |header|
             # There should always be one key from the discovery endpoint that
             # matches the id in the JWT header.
-            x5c = signing_keys.find do |key|
+            x5c = (signing_keys.find do |key|
               key['kid'] == header['kid']
-            end['x5c'].first
+            end || {})['x5c']
+            if x5c.nil? || x5c.empty?
+              fail JWT::VerificationError,
+                   'No keys from key endpoint match the id token'
+            end
             # The key also contains other fields, such as n and e, that are
             # redundant. x5c is sufficient to verify the id token.
-            OpenSSL::X509::Certificate.new(JWT.base64url_decode(x5c)).public_key
+            OpenSSL::X509::Certificate.new(JWT.base64url_decode(x5c.first)).public_key
           end
         return jwt_claims, jwt_header if jwt_claims['nonce'] == read_nonce
         fail JWT::DecodeError, 'Returned nonce did not match.'
+      end
+
+      ##
+      # Verifies that the c_hash the id token claims matches the authorization
+      # code. See OpenId Connect Core 3.3.2.11.
+      #
+      # @param String code
+      # @param Hash claims
+      # @param Hash header
+      def validate_chash(code, claims, header)
+        # This maps RS256 -> sha256, ES384 -> sha384, etc.
+        algorithm = (header['alg'] || 'RS256').sub(/RS|ES|HS/, 'sha')
+        full_hash = OpenSSL::Digest.new(algorithm).digest code
+        c_hash = JWT.base64url_encode full_hash[0..full_hash.length / 2 - 1]
+        return if c_hash == claims['c_hash']
+        fail JWT::VerificationError,
+             'c_hash in id token does not match auth code.'
       end
 
       ##
