@@ -12,7 +12,10 @@ end
 
 # This can be run with `bundle exec rake rubocop`.
 RuboCop::RakeTask.new(:rubocop) do |t|
-  t.patterns = `git ls-files`.split("\n").select { |f| f.end_with? '.rb' }
+  t.patterns = `git ls-files`.split("\n").select do |f|
+    f.end_with?('.rb') && !f.start_with?('examples')
+
+  end
   t.fail_on_error = false
 end
 
