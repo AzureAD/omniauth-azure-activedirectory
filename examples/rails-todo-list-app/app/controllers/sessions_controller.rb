@@ -6,6 +6,8 @@ class SessionsController < ApplicationController
   end
 
   def create
+    # If the session expires, they still access the same todo list next time
+    # that they log in with omniauth.
     user = User.find_by_provider_and_uid(auth_hash['provider'],
                                          auth_hash['uid'])
     user ||= User.from_omniauth(auth_hash)

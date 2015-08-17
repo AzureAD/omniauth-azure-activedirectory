@@ -1,5 +1,5 @@
 Rails.application.routes.draw do
-  root to: 'pages#home'
+  root to: 'home#index'
 
   resource :session, only: [:destroy]
   resources :graph, only: [:index]
@@ -11,6 +11,10 @@ Rails.application.routes.draw do
   # This is where we are redirected if OmniAuth successfully authenicates
   # the user.
   match '/auth/:provider/callback', to: 'sessions#create', via: [:get, :post]
+
+  # This is where we are redirected if we acquire authorization separately from
+  # OmniAuth.
+  match '/authorize', to: 'signed_in#add_auth', via: [:get, :post]
 
   # This is where we are redirected if OmniAuth fails to authenticate the user.
   # user

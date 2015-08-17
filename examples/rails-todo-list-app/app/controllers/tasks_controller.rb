@@ -7,6 +7,7 @@ class TasksController < SignedInController
   end
 
   def create
+    return unless params['task']['description']   # We don't store empty tasks.
     task = Task.create!(description: params['task']['description'],
                         user_id: current_user.id,
                         user: current_user)
