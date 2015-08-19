@@ -15,7 +15,7 @@ To run this sample you will need
 Note: This can and should be removed once ADAL is available on RubyGems. After that point ADAL will be installed along with the other dependencies in step 3.
 
 ```
-git clone git@github.com/AzureAD/azure-activedirectory-library-for-ruby
+git clone git@github.com:AzureAD/azure-activedirectory-library-for-ruby
 cd azure-activedirectory-library-for-ruby
 gem build adal.gemspec
 gem install adal
@@ -25,8 +25,8 @@ gem install adal
 Note: This can and should be removed once ADAL is available on RubyGems. After that point ADAL will be installed along with the other dependencies in step 3.
 
 ```
-git clone git@github.com/AzureAD/omniauth-azure-activedirectory-library
-cd omniauth-azure-activedirectory-library
+git clone git@github.com:AzureAD/omniauth-azure-activedirectory-priv
+cd omniauth-azure-activedirectory-priv
 gem build omniauth-azure-activedirectory.gemspec
 gem install omniauth-azure-activedirectory
 ```
@@ -44,6 +44,8 @@ bundle
 rake db:schema:load
 ```
 
+Note: Depending on your host environment, you may need to install a Javascript runtime. We suggest Node.js. Installation will differ by platform.
+
 ### Step 5 - Configure the app
 
 Open `config/environment.rb` and replace the `CLIENT_ID`, `CLIENT_SECRET` and `TENANT` with your values.
@@ -51,5 +53,5 @@ Open `config/environment.rb` and replace the `CLIENT_ID`, `CLIENT_SECRET` and `T
 ### Step 6 - Start up Rails
 
 ```
-rails server
+bundle exec rails server -b 0.0.0.0 -p 9292
 ```
