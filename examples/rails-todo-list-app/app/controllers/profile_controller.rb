@@ -1,17 +1,16 @@
-class GraphController < SignedInController
+class ProfileController < SignedInController
 
   # If we have the user's ADAL credentials, then we can get an access token.
   # Otherwise we need to do the auth code flow dance.
   def index
-    access_token = current_user.graph_access_token
-    @user_data = user_data(access_token)
+    @profile = user_data_hash(current_user.graph_access_token)
     super
   rescue ADAL::TokenRequest::UserCredentialError
     redirect_to User.authorization_request_url.to_s
   end
 
   # @return Hash
-  def user_data(access_token)
+  def user_data_hash(access_token)
     headers = { 'authorization' => access_token }
     me_endpt = URI('https://graph.windows.net/me?api-version=1.5')
     http = Net::HTTP.new(me_endpt.hostname, me_endpt.port)

@@ -2,7 +2,7 @@ Rails.application.routes.draw do
   root to: 'home#index'
 
   resource :session, only: [:destroy]
-  resources :graph, only: [:index]
+  resources :profile, only: [:index]
   resources :tasks, only: [:index, :update, :create, :destroy, :post]
 
   # This is where we send people to authenticate with OmniAuth.

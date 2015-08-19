@@ -38,7 +38,17 @@ cd examples/rails-todo-list-app
 bundle
 ```
 
-### Step 4 - Start up Rails
+### Step 4 - Set up the database
+
+```
+rake db:schema:load
+```
+
+### Step 5 - Configure the app
+
+Open `config/environment.rb` and replace the `CLIENT_ID`, `CLIENT_SECRET` and `TENANT` with your values.
+
+### Step 6 - Start up Rails
 
 ```
 rails server
