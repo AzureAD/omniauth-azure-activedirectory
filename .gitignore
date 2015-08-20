@@ -1,9 +1,9 @@
 *.gem
 *.log
 .bundle
+coverage
 .powenv
 .rspec
 Gemfile.lock
-bin
 pkg/*
 tmp

@@ -1,0 +1,13 @@
+%h4 This is your personal information from the AzureAD graph
+%br
+= label_tag :name, "Name: #{@profile['displayName']}"
+%br
+= label_tag :phone, "Phone: #{@profile['mobile']}"
+%br
+= label_tag :position, "Position: #{@profile['jobTitle']}"
+%br
+= label_tag :address, "Address: #{@profile['streetAddress']}"
+%br
+= label_tag :postal_code, "Postal code: #{@profile['postalCode']}"
+%br
+= label_tag :country, "Country: #{@profile['country']}"

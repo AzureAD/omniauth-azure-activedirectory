@@ -1,0 +1,11 @@
+#task_index
+  %h3 Add a new task
+  = form_for(@new_task) do |form|
+    = form.text_field :description
+    = form.submit
+
+  %h3 Your tasks
+  - @tasks.each do |task|
+    %li.task
+      = button_to 'Delete', task_path(task), method: :delete, data: { confirm: 'Are you sure?' }, form: { style: 'display:inline-block;' }
+      = label :description, task.description
