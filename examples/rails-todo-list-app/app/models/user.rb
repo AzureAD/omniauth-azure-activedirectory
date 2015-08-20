@@ -11,7 +11,7 @@ class User < ActiveRecord::Base
     user = User.where(provider: auth_hash[:provider],
                       uid: auth_hash[:uid]).first_or_create
     user.name = auth_hash[:info]['name']
-    user.email = auth_hash[:info]['email']
+    user.email = auth_hash[:info]['email'] || auth_hash[:info][:urls][:Twitter]
 
     # Note that this is the first part that is AAD specific.
     if auth_hash[:credentials]['code']

@@ -17,6 +17,9 @@ gem 'omniauth'
 # AzureAD specific strategy for OmniAuth.
 gem 'omniauth-azure-activedirectory'
 
+# Twitter specific strategy for OmniAuth.
+gem 'omniauth-twitter'
+
 # Loads configurations from .env into ENV hash.
 gem 'dotenv'
 

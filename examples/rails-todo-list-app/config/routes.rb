@@ -13,6 +13,8 @@ Rails.application.routes.draw do
   # This is where we send people to authenticate with OmniAuth.
   get '/auth/azureactivedirectory', as: :sign_in
 
+  get '/auth/twitter', as: :sign_in_twitter
+
   # This is where we are redirected if OmniAuth successfully authenicates
   # the user.
   match '/auth/:provider/callback', to: 'sessions#create', via: [:get, :post]
