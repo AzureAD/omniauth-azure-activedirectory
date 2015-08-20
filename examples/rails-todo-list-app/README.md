@@ -50,8 +50,32 @@ Note: Depending on your host environment, you may need to install a Javascript r
 
 Open `config/environment.rb` and replace the `CLIENT_ID`, `CLIENT_SECRET` and `TENANT` with your values.
 
-### Step 6 - Start up Rails
+### Step 6 - Set up SSL
+
+This step is optional to get the sample running and varies across platform and choice of webserver. Here we will present one set of instructions to accomplish this, but there are many others.
+
+Generate a self-signed certificate.
 
 ```
-bundle exec rails server -b 0.0.0.0 -p 9292
+openssl req -new -newkey rsa:2048 -sha1 -days 365 -nodes -x509 -keyout server.key -out server.crt
+```
+
+Get your machine/browser to trust the certificate. This varies wildly by platform.
+
+On OSX with Safari or Chrome, double click on `server.crt` in Finder to add it to the keychain and then select 'Trust Always'.
+
+### Step 7 - Start up Rails
+
+This sample uses the Thin webserver to host the app on port 9292.
+
+If you generated a certificate in Step 6
+
+```
+bundle exec thin start --port 9292 --ssl --ssl-key-file server.key --ssl-cert-file server.crt
+```
+
+If you want to skip SSL verification (shame!)
+
+```
+bundle exec thing start --port 9292 --ssl --ssl-disable-verify
 ```

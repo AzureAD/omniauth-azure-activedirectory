@@ -8,6 +8,9 @@ gem 'sqlite3'
 # Templating library for views.
 gem 'haml'
 
+# The actual web server.
+gem 'thin'
+
 # Rack middleware authentication framework.
 gem 'omniauth'
 
