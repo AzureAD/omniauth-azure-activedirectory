@@ -62,7 +62,7 @@ openssl req -new -newkey rsa:2048 -sha1 -days 365 -nodes -x509 -keyout server.ke
 
 Get your machine/browser to trust the certificate. This varies wildly by platform.
 
-On OSX with Safari or Chrome, double click on `server.crt` in Finder to add it to the keychain and then select 'Trust Always'.
+On OSX with Safari or Chrome, double click on `server.crt` in Finder to add it to the keychain and then select 'Trust Always'. In Firefox go to Preferences > Advanced > View Certificates > Import and add `server.crt`.
 
 ### Step 7 - Start up Rails
 
@@ -79,3 +79,5 @@ If you want to skip SSL verification (shame!)
 ```
 bundle exec thing start --port 9292 --ssl --ssl-disable-verify
 ```
+
+You may now proceed to https://localhost:9292 to view the application. You may get a warning about the self-signed certificate. This is nothing to worry about, as in production you will not be using self-signed certs.
