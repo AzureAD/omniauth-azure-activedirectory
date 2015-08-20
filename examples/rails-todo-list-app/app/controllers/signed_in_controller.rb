@@ -15,7 +15,7 @@ class SignedInController < ApplicationController
   def add_auth
     current_user.redeem_code(
       params['code'],
-      'http://localhost:9292/authorize')
+      'https://localhost:9292/authorize')
     redirect_to profile_index_path
   end
 

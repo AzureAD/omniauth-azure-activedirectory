@@ -17,7 +17,7 @@ class User < ActiveRecord::Base
     if auth_hash[:credentials]['code']
       user.redeem_code(
         auth_hash[:credentials]['code'],
-        'http://localhost:9292/auth/azureactivedirectory/callback')
+        'https://localhost:9292/auth/azureactivedirectory/callback')
     end
     user.save!
     user
@@ -43,7 +43,7 @@ class User < ActiveRecord::Base
     AUTH_CTX.authorization_request_url(
       GRAPH_RESOURCE,
       ENV['CLIENT_ID'], 
-      'http://localhost:9292/authorize')
+      'https://localhost:9292/authorize')
   end
 
   private
