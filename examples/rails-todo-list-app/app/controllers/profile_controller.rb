@@ -3,7 +3,7 @@ class ProfileController < SignedInController
   # If we have the user's ADAL credentials, then we can get an access token.
   # Otherwise we need to do the auth code flow dance.
   def index
-    @profile = user_data_hash(current_user.graph_access_token)
+    @profile = user_data_hash(current_user.access_token('https://graph.windows.net'))
     super
   rescue ADAL::TokenRequest::UserCredentialError
     redirect_to User.authorization_request_url.to_s

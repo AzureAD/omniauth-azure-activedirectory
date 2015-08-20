@@ -23,8 +23,8 @@ class User < ActiveRecord::Base
     user
   end
 
-  def graph_access_token
-    AUTH_CTX.acquire_token_for_user(GRAPH_RESOURCE, CLIENT_CRED, adal_user_identifier).access_token
+  def access_token(resource)
+    AUTH_CTX.acquire_token_for_user(resource, CLIENT_CRED, adal_user_identifier).access_token
   end
 
   def redeem_code(auth_code, reply_url)

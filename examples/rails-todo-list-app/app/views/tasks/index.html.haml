@@ -9,3 +9,9 @@
     %li.task
       = button_to 'Delete', task_path(task), method: :delete, data: { confirm: 'Are you sure?' }, form: { style: 'display:inline-block;' }
       = label :description, task.description
+  %br
+  = button_to 'Save task list to OneDrive', cloud_save_tasks_path
+  %br
+  - if flash[:notice]
+    %strong
+      = flash[:notice]

@@ -4,6 +4,11 @@ Rails.application.routes.draw do
   resource :session, only: [:destroy]
   resources :profile, only: [:index]
   resources :tasks, only: [:index, :update, :create, :destroy, :post]
+  resources :tasks do
+    collection do
+      post 'cloud_save', action: :cloud_save
+    end
+  end
 
   # This is where we send people to authenticate with OmniAuth.
   get '/auth/azureactivedirectory', as: :sign_in

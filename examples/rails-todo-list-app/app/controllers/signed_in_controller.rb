@@ -16,7 +16,7 @@ class SignedInController < ApplicationController
     current_user.redeem_code(
       params['code'],
       'https://localhost:9292/authorize')
-    redirect_to profile_index_path
+    redirect_to tasks_path
   end
 
   def current_user
