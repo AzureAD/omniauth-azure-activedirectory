@@ -1,8 +1,8 @@
 # You may want to specify these keys separately for production and test
 # environments.
-ENV['CLIENT_ID'] = 'd0644584-61de-4bca-98ab-e75af0ff5528'
-ENV['CLIENT_SECRET'] = 'La55NMCC2ouDu3grNO5/wlCjE7qmAV0YnJFFIOYVU6U='
-ENV['TENANT'] ='adamajmichael.onmicrosoft.com'
+ENV['CLIENT_ID'] = 'YOUR CLIENT ID HERE'
+ENV['CLIENT_SECRET'] = 'YOUR CLIENT SECRET HERE'
+ENV['TENANT'] ='YOUR TENANT HERE'
 
 # Load the Rails application.
 require File.expand_path('../application', __FILE__)
