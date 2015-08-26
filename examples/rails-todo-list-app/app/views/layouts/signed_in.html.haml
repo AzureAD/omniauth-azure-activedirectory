@@ -1,0 +1,18 @@
+!!!
+%html
+  %head
+    %title RailsTodoListApp
+    = stylesheet_link_tag "application", media: "all"
+    = javascript_include_tag "application"
+    = csrf_meta_tags
+  %body
+    %h1
+      Todo List
+    %p
+      #{@current_user.name} &lt#{@current_user.email}&gt.
+      %br
+      = link_to "Todo List", tasks_path
+      = link_to "Profile", profile_index_path
+      = link_to "Sign out", session_path, method: :delete
+    #main
+      = yield

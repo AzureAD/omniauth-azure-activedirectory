@@ -1,0 +1,9 @@
+*.gem
+*.log
+.bundle
+coverage
+.powenv
+.rspec
+Gemfile.lock
+pkg/*
+tmp
