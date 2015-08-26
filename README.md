@@ -95,4 +95,4 @@ Here's an example of an authentication hash available in the callback. You can a
 
 # License
 
-Copyright (c) Microsoft Open Technologies, Inc.  All rights reserved. Licensed under the Apache License, Version 2.0 (the "License");
+Copyright (c) Microsoft Corporation. Licensed under the MIT License.
