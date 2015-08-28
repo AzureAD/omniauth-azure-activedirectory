@@ -1,5 +1,6 @@
 # OmniAuth Azure Active Directory
 [![Build Status](https://travis-ci.org/AzureAD/omniauth-azure-activedirectory.png?branch=master)](https://travis-ci.org/AzureAD/omniauth-azure-activedirectory)
+[![Code Climate](https://codeclimate.com/github/AzureAD/omniauth-azure-activedirectory/badges/gpa.svg)](https://codeclimate.com/github/AzureAD/omniauth-azure-activedirectory/badges/gpa.svg)
 
 OmniAuth strategy to authenticate to Azure Active Directory via OpenId Connect.
 
