@@ -49,15 +49,15 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
   end
 
   let(:tenant) { 'tenant' }
-  let(:openid_config_response) { "{\"issuer\":\"#{issuer}\",\"authorization_endpoint\":\"http://#{auth_endpoint_host}\",\"jwks_uri\":\"https://login.windows.net/common/discovery/keys\"}" }
+  let(:openid_config_response) { "{\"issuer\":\"#{issuer}\",\"authorization_endpoint\":\"http://#{auth_endpoint_host}\",\"jwks_uri\":\"https://login.microsoftonline.com/common/discovery/keys\"}" }
   let(:keys_response) { "{\"keys\":[{\"kid\":\"#{kid}\",\"x5c\":[\"#{x5c}\"]}]}" }
 
   let(:env) { { 'rack.session' => { 'omniauth-azure-activedirectory.nonce' => nonce } } }
 
   before(:each) do
-    stub_request(:get, "https://login.windows.net/#{tenant}/.well-known/openid-configuration")
+    stub_request(:get, "https://login.microsoftonline.com/#{tenant}/.well-known/openid-configuration")
       .to_return(status: 200, body: openid_config_response)
-    stub_request(:get, 'https://login.windows.net/common/discovery/keys')
+    stub_request(:get, 'https://login.microsoftonline.com/common/discovery/keys')
       .to_return(status: 200, body: keys_response)
   end
 
