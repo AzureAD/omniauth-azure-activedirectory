@@ -85,13 +85,16 @@ module OmniAuth
       # credentials at the authorization endpoint.
       def callback_phase
         error = request.params['error_reason'] || request.params['error']
-        fail(OAuthError, error) if error
-        @session_state = request.params['session_state']
-        @id_token = request.params['id_token']
-        @code = request.params['code']
-        @claims, @header = validate_and_parse_id_token(@id_token)
-        validate_chash(@code, @claims, @header)
-        super
+        if error
+          fail!(error)
+        else
+          @session_state = request.params['session_state']
+          @id_token = request.params['id_token']
+          @code = request.params['code']
+          @claims, @header = validate_and_parse_id_token(@id_token)
+          validate_chash(@code, @claims, @header)
+          super
+        end
       end
 
       private
