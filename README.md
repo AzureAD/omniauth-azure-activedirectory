@@ -6,7 +6,23 @@ OmniAuth strategy to authenticate to Azure Active Directory via OpenId Connect.
 
 Before starting, set up a tenant and register a Web Application at [https://manage.windowsazure.com](https://manage.windowsazure.com). Note your client id and tenant for later.
 
-# Installation
+## Samples and Documentation
+
+[We provide a full suite of sample applications and documentation on GitHub](https://github.com/AzureADSamples) to help you get started with learning the Azure Identity system. This includes tutorials for native clients such as Windows, Windows Phone, iOS, OSX, Android, and Linux. We also provide full walkthroughs for authentication flows such as OAuth2, OpenID Connect, Graph API, and other awesome features. 
+
+## Community Help and Support
+
+We leverage [Stack Overflow](http://stackoverflow.com/) to work with the community on supporting Azure Active Directory and its SDKs, including this one! We highly recommend you ask your questions on Stack Overflow (we're all on there!) Also browser existing issues to see if someone has had your question before. 
+
+We recommend you use the "adal" tag so we can see it! Here is the latest Q&A on Stack Overflow for ADAL: [http://stackoverflow.com/questions/tagged/adal](http://stackoverflow.com/questions/tagged/adal)
+
+## Security Reporting
+
+If you find a security issue with our libraries or services please report it to [secure@microsoft.com](mailto:secure@microsoft.com) with as much detail as possible. Your submission may be eligible for a bounty through the [Microsoft Bounty](http://aka.ms/bugbounty) program. Please do not post security issues to GitHub Issues or any other public site. We will contact you shortly upon receiving the information. We encourage you to get notifications of when security incidents occur by visiting [this page](https://technet.microsoft.com/en-us/security/dd252948) and subscribing to Security Advisory Alerts.
+
+## How to use this SDK
+
+#### Installation
 
 Add to your Gemfile:
 
@@ -14,7 +30,7 @@ Add to your Gemfile:
 gem 'omniauth-azure-activedirectory'
 ```
 
-# Usage
+### Usage
 
 If you are already using OmniAuth, adding AzureAD is as simple as adding a new provider to your `OmniAuth::Builder`. The provider requires your AzureAD client id and your AzureAD tenant.
 
@@ -50,7 +66,7 @@ If you are supporting multiple OmniAuth providers, you will likely have somethin
 end
 ```
 
-# Auth Hash
+### Auth Hash
 
 OmniAuth AzureAD tries to be consistent with the auth hash schema recommended by OmniAuth. [https://github.com/intridea/omniauth/wiki/Auth-Hash-Schema](https://github.com/intridea/omniauth/wiki/Auth-Hash-Schema).
 
@@ -95,6 +111,6 @@ Here's an example of an authentication hash available in the callback. You can a
   }
 ```
 
-# License
+## License
 
 Copyright (c) Microsoft Corporation. Licensed under the MIT License.
