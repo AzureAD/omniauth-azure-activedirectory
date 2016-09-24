@@ -318,6 +318,7 @@ module OmniAuth
           verify_not_before: true,
           verify_iat: true,
           verify_iss: true,
+          leeway: 120,
           'iss' => issuer,
           verify_aud: true,
           'aud' => client_id }
