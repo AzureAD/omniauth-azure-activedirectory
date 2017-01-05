@@ -25,7 +25,7 @@ require 'omniauth-azure-activedirectory'
 
 # This was fairly awkward to test. I've stubbed every endpoint and am simulating
 # the state of the request. Especially large strings are stored in fixtures.
-describe OmniAuth::Strategies::AzureActiveDirectory do
+describe OmniAuth::Strategies::AzureActivedirectory do
   let(:app) { -> _ { [200, {}, ['Hello world.']] } }
   let(:x5c) { File.read(File.expand_path('../../../fixtures/x5c.txt', __FILE__)) }
 
