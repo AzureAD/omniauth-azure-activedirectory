@@ -115,6 +115,10 @@ Here's an example of an authentication hash available in the callback. You can a
   }
 ```
 
+## Multi Tenant account
+
+Currently gem supports single Tentant please check [Wiki page on how to set up Multi Tenant](https://github.com/AzureAD/omniauth-azure-activedirectory/wiki/Setup-Multi-tenant)
+
 ## License
 
 Copyright (c) Microsoft Corporation. Licensed under the MIT License.
