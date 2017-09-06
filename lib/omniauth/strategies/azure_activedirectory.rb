@@ -48,6 +48,7 @@ module OmniAuth
       args [:client_id, :tenant]
       option :client_id, nil
       option :tenant, nil
+      option :redirect_params, {}
 
       # Field renaming is an attempt to fit the OmniAuth recommended schema as
       # best as possible.
@@ -107,8 +108,13 @@ module OmniAuth
                                         redirect_uri: callback_url,
                                         response_mode: response_mode,
                                         response_type: response_type,
-                                        nonce: new_nonce)
+                                        nonce: new_nonce,
+                                        **redirect_params)
         uri.to_s
+      end
+
+      def redirect_params
+        options.redirect_params.to_hash(symbolize_keys: true)
       end
 
       ##
