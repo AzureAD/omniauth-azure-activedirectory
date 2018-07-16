@@ -49,6 +49,17 @@ module OmniAuth
       option :client_id, nil
       option :tenant, nil
 
+      # instead of hard coding client_id and tenant, you may pass a class that
+      # determines these values at runtime to support multiple tenants
+      option :tenant_provider, nil
+
+      # points to the openid discovery json document. may also be set by the
+      # tenant provider (just implement an openid_config_url method)
+      #
+      # Defaults to
+      # "https://login.windows.net/#{tenant}/.well-known/openid-configuration"
+      option :openid_config_url
+
       # Field renaming is an attempt to fit the OmniAuth recommended schema as
       # best as possible.
       #
@@ -71,6 +82,22 @@ module OmniAuth
 
       DEFAULT_RESPONSE_TYPE = 'code id_token'
       DEFAULT_RESPONSE_MODE = 'form_post'
+
+      ##
+      # Overridden method from OmniAuth::Strategy. This is called before
+      # request_phase or callback_phase are called.
+      def setup_phase
+        if options.tenant_provider
+          provider = options.tenant_provider.new(self)
+          options.client_id = provider.client_id
+          options.tenant = provider.tenant_id
+          if provider.respond_to?(:openid_config_url)
+            options.openid_config_url = provider.openid_config_url
+          end
+        end
+
+        super
+      end
 
       ##
       # Overridden method from OmniAuth::Strategy. This is the first step in the
@@ -103,12 +130,24 @@ module OmniAuth
       # @return String
       def authorize_endpoint_url
         uri = URI(openid_config['authorization_endpoint'])
-        uri.query = URI.encode_www_form(client_id: client_id,
-                                        redirect_uri: callback_url,
-                                        response_mode: response_mode,
-                                        response_type: response_type,
-                                        nonce: new_nonce)
+        params = {
+          client_id: client_id,
+          scope: "openid",
+          redirect_uri: redirect_uri,
+          response_mode: response_mode,
+          response_type: response_type,
+          nonce: new_nonce
+        }.to_a
+        # preserve existing URL params
+        if uri.query.present?
+          params += URI.decode_www_form(String(uri.query))
+        end
+        uri.query = URI.encode_www_form(params)
         uri.to_s
+      end
+
+      def redirect_uri
+        options[:redirect_uri] || callback_url
       end
 
       ##
@@ -195,7 +234,8 @@ module OmniAuth
       #
       # @return String
       def openid_config_url
-        "https://login.windows.net/#{tenant}/.well-known/openid-configuration"
+        options[:openid_config_url] ||
+          "https://login.windows.net/#{tenant}/.well-known/openid-configuration"
       end
 
       ##
@@ -274,16 +314,33 @@ module OmniAuth
           JWT.decode(id_token, nil, true, verify_options) do |header|
             # There should always be one key from the discovery endpoint that
             # matches the id in the JWT header.
-            x5c = (signing_keys.find do |key|
-              key['kid'] == header['kid']
-            end || {})['x5c']
-            if x5c.nil? || x5c.empty?
-              fail JWT::VerificationError,
-                   'No keys from key endpoint match the id token'
+            unless key = signing_keys.find{|k|
+              k['kid'] == header['kid']
+            }
+              fail JWT::VerificationError, 'No keys from key endpoint match the id token'
             end
+
             # The key also contains other fields, such as n and e, that are
             # redundant. x5c is sufficient to verify the id token.
-            OpenSSL::X509::Certificate.new(JWT.base64url_decode(x5c.first)).public_key
+            if x5c = key['x5c'] and !x5c.empty?
+              OpenSSL::X509::Certificate.new(JWT.base64url_decode(x5c.first)).public_key
+            # no x5c, so we resort to e and n
+            elsif exp = key['e'] and mod = key['n']
+              key = OpenSSL::PKey::RSA.new
+              mod = OpenSSL::BN.new Base64.urlsafe_decode64(mod), 2
+              exp = OpenSSL::BN.new Base64.urlsafe_decode64(exp), 2
+              if key.respond_to? :set_key
+                # Ruby 2.4 ff
+                key.set_key mod, exp, nil
+              else
+                # Ruby < 2.4
+                key.e = exp
+                key.n = mod
+              end
+              key.public_key
+            else
+              fail JWT::VerificationError, 'Key has no info for verification'
+            end
           end
         return jwt_claims, jwt_header if jwt_claims['nonce'] == read_nonce
         fail JWT::DecodeError, 'Returned nonce did not match.'
@@ -315,6 +372,7 @@ module OmniAuth
       # @return Hash
       def verify_options
         { verify_expiration: true,
+          algorithms: %w(RS256),
           verify_not_before: true,
           verify_iat: true,
           verify_iss: true,
