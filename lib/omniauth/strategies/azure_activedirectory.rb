@@ -327,8 +327,8 @@ module OmniAuth
             # no x5c, so we resort to e and n
             elsif exp = key['e'] and mod = key['n']
               key = OpenSSL::PKey::RSA.new
-              mod = OpenSSL::BN.new Base64.urlsafe_decode64(mod), 2
-              exp = OpenSSL::BN.new Base64.urlsafe_decode64(exp), 2
+              mod = openssl_bn_for mod
+              exp = openssl_bn_for exp
               if key.respond_to? :set_key
                 # Ruby 2.4 ff
                 key.set_key mod, exp, nil
@@ -344,6 +344,18 @@ module OmniAuth
           end
         return jwt_claims, jwt_header if jwt_claims['nonce'] == read_nonce
         fail JWT::DecodeError, 'Returned nonce did not match.'
+      end
+
+      def openssl_bn_for(s)
+        s.strip!
+        # Pad the string so its length is divisible by 4
+        # this is necessary only with Ruby < 2.3, from then on
+        # Base64.urlsafe_decode64 is clever enough to add the padding itself
+        if !s.end_with?("=") && s.length % 4 != 0
+          s = s.ljust((s.length + 3) & ~3, "=")
+        end
+        bytes = Base64.urlsafe_decode64 s
+        OpenSSL::BN.new bytes, 2
       end
 
       ##
