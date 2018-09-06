@@ -111,8 +111,10 @@ module OmniAuth
       # the authentication process. It is called after the user enters
       # credentials at the authorization endpoint.
       def callback_phase
-        error = request.params['error_reason'] || request.params['error']
-        fail(OAuthError, error) if error
+        if error = request.params['error_reason'] || request.params['error']
+          fail! error, OAuthError
+          return
+        end
         @session_state = request.params['session_state']
         @id_token = request.params['id_token']
         @code = request.params['code']
