@@ -32,8 +32,6 @@ module OmniAuth
       include OmniAuth::AzureActiveDirectory
       include OmniAuth::Strategy
 
-      class OAuthError < StandardError; end
-
       ##
       # The client id (key) and tenant must be configured when the OmniAuth
       # middleware is installed. Example:
@@ -112,7 +110,7 @@ module OmniAuth
       # credentials at the authorization endpoint.
       def callback_phase
         if error = request.params['error_reason'] || request.params['error']
-          fail! error, OAuthError
+          fail! error # invokes the configured on_failure handler
           return
         end
         @session_state = request.params['session_state']
