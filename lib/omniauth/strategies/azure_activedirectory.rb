@@ -58,6 +58,12 @@ module OmniAuth
       # "https://login.windows.net/#{tenant}/.well-known/openid-configuration"
       option :openid_config_url
 
+      # URL parameter(s) to be used with the authorize_endpoint_url for triggering
+      # display of the password reset page.may also be set by the
+      # tenant provider (just implement the reset_password_param method)
+      # This has to be a valid query string, i.e. "p=B2C_1_sipr"
+      option :reset_password_param
+
       # Field renaming is an attempt to fit the OmniAuth recommended schema as
       # best as possible.
       #
@@ -92,6 +98,9 @@ module OmniAuth
           if provider.respond_to?(:openid_config_url)
             options.openid_config_url = provider.openid_config_url
           end
+          if provider.respond_to?(:reset_password_param)
+            options.reset_password_param = provider.reset_password_param
+          end
         end
 
         super
@@ -110,9 +119,19 @@ module OmniAuth
       # credentials at the authorization endpoint.
       def callback_phase
         if error = request.params['error_reason'] || request.params['error']
-          fail! error # invokes the configured on_failure handler
-          return
+
+          if error == 'access_denied' and
+            desc = request.params['error_description'] and
+            desc =~ /^AADB2C90118:/
+
+            return redirect reset_password_endpoint_url
+
+          else
+            return fail!(error) # invokes the configured on_failure handler and return its response
+          end
+
         end
+
         @session_state = request.params['session_state']
         @id_token = request.params['id_token']
         @code = request.params['code']
@@ -122,6 +141,7 @@ module OmniAuth
       end
 
       private
+
 
       ##
       # Constructs a one-time-use authorize_endpoint. This method will use
@@ -144,6 +164,22 @@ module OmniAuth
         end
         uri.query = URI.encode_www_form(params)
         uri.to_s
+      end
+
+      ##
+      # URL of the Azure password reset page
+      #
+      def reset_password_endpoint_url
+        if query_string = options["reset_password_param"]
+          uri = URI(authorize_endpoint_url)
+          reset_password_param = Hash[URI.decode_www_form(query_string)]
+          params = Hash[URI.decode_www_form(String(uri.query))]
+          params.update reset_password_param
+          uri.query = URI.encode_www_form params.to_a
+          uri.to_s
+        else
+          authorize_endpoint_url
+        end
       end
 
       def redirect_uri
