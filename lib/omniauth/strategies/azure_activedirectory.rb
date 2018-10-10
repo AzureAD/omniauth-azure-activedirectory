@@ -102,12 +102,20 @@ module OmniAuth
       #
       # @return String
       def authorize_endpoint_url
+        params = {
+          client_id: client_id,
+          redirect_uri: callback_url,
+          response_mode: response_mode,
+          response_type: response_type,
+          nonce: new_nonce
+        }
+
+        params[:state] = state unless state.nil?
+        params[:prompt] = prompt unless prompt.nil?
+        params[:login_hint] = login_hint unless login_hint.nil?
+
         uri = URI(openid_config['authorization_endpoint'])
-        uri.query = URI.encode_www_form(client_id: client_id,
-                                        redirect_uri: callback_url,
-                                        response_mode: response_mode,
-                                        response_type: response_type,
-                                        nonce: new_nonce)
+        uri.query = URI.encode_www_form(params)
         uri.to_s
       end
 
@@ -227,6 +235,45 @@ module OmniAuth
         options[:response_mode] || DEFAULT_RESPONSE_MODE
       end
 
+      ##
+      # A value included in the request that is returned in the token response.
+      # It can be a string of any content that you wish. A randomly generated
+      # unique value is typically used for preventing cross-site request
+      # forgery attacks. The state is also used to encode information about the
+      # user's state in the app before the authentication request occurred,
+      # such as the page or view they were on.
+      #
+      # @return String
+      def state
+        options[:state] || nil
+      end
+
+      ##
+      # Indicates the type of user interaction that is required. Currently,
+      # the only valid values are 'login', 'none', and 'consent'. prompt=login
+      # forces the user to enter their credentials on that request, negating
+      # single-sign on. prompt=none is the opposite - it ensures that the user
+      # is not presented with any interactive prompt whatsoever. If the request
+      # cannot be completed silently via single-sign on, the endpoint returns
+      # an error. prompt=consent triggers the OAuth consent dialog after the
+      # user signs in, asking the user to grant permissions to the app
+      #
+      # @return String
+      def prompt
+        options[:prompt] || nil
+      end
+
+      ##
+      # Can be used to pre-fill the username/email address field of the sign-in
+      # page for the user, if you know their username ahead of time. Often apps
+      # use this parameter during reauthentication, having already extracted
+      # the username from a previous sign-in using the preferred_username claim
+      #
+      # @return String
+      def login_hint
+        options[:login_hint] || nil
+      end
+      
       ##
       # The keys used to sign the id token JWTs. This is just a memoized version
       # of #fetch_signing_keys.
