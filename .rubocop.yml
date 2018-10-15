@@ -4,5 +4,11 @@ AllCops:
   Exclude:
     - 'spec/fixtures/**/*'
 
+Metrics/LineLength:
+  Enabled: false
+
+Metrics/BlockLength:
+  Enabled: false
+
 Style/Encoding:
   Enabled: false

@@ -26,86 +26,101 @@ require 'omniauth-azure-activedirectory'
 # This was fairly awkward to test. I've stubbed every endpoint and am simulating
 # the state of the request. Especially large strings are stored in fixtures.
 describe OmniAuth::Strategies::AzureActiveDirectory do
-  let(:app) { -> _ { [200, {}, ['Hello world.']] } }
-  let(:x5c) { File.read(File.expand_path('../../../fixtures/x5c.txt', __FILE__)) }
+  let(:app) { ->(_) { [200, {}, ['Hello world.']] } }
+  let(:x5c) { File.read(File.expand_path('../../fixtures/x5c.txt', __dir__)) }
 
   # These values were used to create the "successful" id_token JWT.
   let(:client_id) { 'the client id' }
   let(:code) { 'code' }
   let(:email) { 'jsmith@contoso.com' }
-  let(:family_name) { 'smith' }
-  let(:given_name) { 'John' }
   let(:issuer) { 'https://sts.windows.net/bunch-of-random-chars' }
   let(:kid) { 'abc123' }
   let(:name) { 'John Smith' }
+  let(:preferred_username) { 'jsmith@contoso.com' }
   let(:nonce) { 'my nonce' }
   let(:session_state) { 'session state' }
   let(:auth_endpoint_host) { 'authorize.com' }
+  let(:options) { { verify_iss: true } }
+  let(:base_config) { { client_id: client_id, client_secret: 'secret', tenant: tenant }.merge(options) }
+  let(:tenant) { 'tenant' }
+  let(:openid_config_response) do
+    {
+      issuer: issuer,
+      authorization_endpoint: "http://#{auth_endpoint_host}",
+      jwks_uri: "https://login.microsoftonline.com/#{tenant}/discovery/v2.0/keys",
+      token_endpoint: "https://login.microsoftonline.com/#{tenant}/oauth2/v2.0/token"
+    }.to_json
+  end
+  let(:keys_response) do
+    {
+      keys: [
+        {
+          kid: kid,
+          x5c: [x5c]
+        }
+      ]
+    }.to_json
+  end
+  let(:env) { { 'rack.session' => { 'omniauth-azure-activedirectory.nonce' => nonce } } }
+  let(:client) { OAuth2::Client.new('abc', 'def') }
 
-  let(:hybrid_flow_params) do
-    { 'id_token' => id_token,
+  let(:id_token) { File.read(File.expand_path('../../fixtures/id_token.txt', __dir__)) }
+  let(:params) do
+    {
+      'id_token' => id_token,
       'session_state' => session_state,
-      'code' => code }
+      'code' => code
+    }
+  end
+  let(:request) { double('Request', params: params, path_info: 'path') }
+  let(:access_token) do
+    OAuth2::AccessToken.from_hash(
+      client,
+      'id_token' => id_token
+    )
+  end
+  let(:strategy) do
+    described_class.new(app, base_config).tap do |s|
+      allow(s).to receive(:request) { request }
+      allow(s).to receive(:access_token).and_return(access_token)
+    end
   end
 
-  let(:tenant) { 'tenant' }
-  let(:openid_config_response) { "{\"issuer\":\"#{issuer}\",\"authorization_endpoint\":\"http://#{auth_endpoint_host}\",\"jwks_uri\":\"https://login.windows.net/common/discovery/keys\"}" }
-  let(:keys_response) { "{\"keys\":[{\"kid\":\"#{kid}\",\"x5c\":[\"#{x5c}\"]}]}" }
-
-  let(:env) { { 'rack.session' => { 'omniauth-azure-activedirectory.nonce' => nonce } } }
-
+  subject { -> { strategy.auth_hash } }
   before(:each) do
-    stub_request(:get, "https://login.windows.net/#{tenant}/.well-known/openid-configuration")
+    strategy.call!(env)
+    stub_request(:get, "https://login.microsoftonline.com/#{tenant}/v2.0/.well-known/openid-configuration/")
       .to_return(status: 200, body: openid_config_response)
-    stub_request(:get, 'https://login.windows.net/common/discovery/keys')
+    stub_request(:get, "https://login.microsoftonline.com/#{tenant}/discovery/v2.0/keys")
       .to_return(status: 200, body: keys_response)
   end
 
-  describe '#callback_phase' do
-    let(:request) { double('Request', params: hybrid_flow_params, path_info: 'path') }
-    let(:strategy) do
-      described_class.new(app, client_id, tenant).tap do |s|
-        allow(s).to receive(:request) { request }
-      end
-    end
-
-    subject { -> { strategy.callback_phase } }
-    before(:each) { strategy.call!(env) }
-
+  describe '#auth_hash' do
     context 'with a successful response' do
       # payload:
       #   { 'iss' => 'https://sts.windows.net/bunch-of-random-chars',
       #     'name' => 'John Smith',
       #     'aud' => 'the client id',
       #     'nonce' => 'my nonce',
-      #     'email' => 'jsmith@contoso.com',
-      #     'given_name' => 'John',
-      #     'family_name' => 'Smith' }
+      #     'email' => 'jsmith@contoso.com' }
       # headers:
       #   { 'typ' => 'JWT',
       #     'alg' => 'RS256',
       #     'kid' => 'abc123' }
       #
-      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token.txt', __FILE__)) }
 
       # If it passes this test, then the id was successfully validated.
       it { is_expected.to_not raise_error }
 
       describe 'the auth hash' do
-        before(:each) { strategy.callback_phase }
-
-        subject { env['omniauth.auth'] }
+        subject { strategy.auth_hash }
 
         it 'should contain the name' do
           expect(subject.info['name']).to eq name
         end
 
-        it 'should contain the first name' do
-          expect(subject.info['first_name']).to eq given_name
-        end
-
-        it 'should contain the last name' do
-          expect(subject.info['last_name']).to eq family_name
+        it 'should contain the preferred_username' do
+          expect(subject.info['preferred_username']).to eq preferred_username
         end
 
         it 'should contain the email' do
@@ -123,10 +138,11 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
     end
 
     context 'with an invalid issuer' do
+      subject { -> { strategy.auth_hash } }
       # payload:
       #   { 'iss' => 'https://sts.imposter.net/bunch-of-random-chars', ... }
       #
-      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_issuer.txt', __FILE__)) }
+      let(:id_token) { File.read(File.expand_path('../../fixtures/id_token_bad_issuer.txt', __dir__)) }
       it { is_expected.to raise_error JWT::InvalidIssuerError }
     end
 
@@ -134,7 +150,7 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       # payload:
       #   { 'aud' => 'not the client id', ... }
       #
-      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_audience.txt', __FILE__)) }
+      let(:id_token) { File.read(File.expand_path('../../fixtures/id_token_bad_audience.txt', __dir__)) }
       it { is_expected.to raise_error JWT::InvalidAudError }
     end
 
@@ -142,46 +158,44 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       # payload:
       #   { 'nonce' => 'not my nonce', ... }
       #
-      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_nonce.txt', __FILE__)) }
+      let(:id_token) { File.read(File.expand_path('../../fixtures/id_token_bad_nonce.txt', __dir__)) }
       it { is_expected.to raise_error JWT::DecodeError }
     end
 
     context 'with the wrong x5c' do
-      let(:x5c) { File.read(File.expand_path('../../../fixtures/x5c_different.txt', __FILE__)) }
-      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token.txt', __FILE__)) }
+      let(:x5c) { File.read(File.expand_path('../../fixtures/x5c_different.txt', __dir__)) }
+      let(:id_token) { File.read(File.expand_path('../../fixtures/id_token.txt', __dir__)) }
       it { is_expected.to raise_error JWT::VerificationError }
     end
 
-    context 'with a non-matching c_hash' do
-      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_chash.txt', __FILE__)) }
-      it { is_expected.to raise_error JWT::VerificationError }
+    # From Microsoft docs:
+    # > The code hash is included in ID tokens only when the ID token is issued
+    # > with an OAuth 2.0 authorization code.
+    #
+    # Since the c_hash isn't always included, we will only validate if it's
+    # present in the id_token.
+    context 'when c_hash is included in id_token' do
+      context 'with a matching c_hash' do
+        let(:id_token) { File.read(File.expand_path('../../fixtures/id_token_with_chash.txt', __dir__)) }
+        it { is_expected.to_not raise_error }
+      end
+
+      context 'with a non-matching c_hash' do
+        let(:id_token) { File.read(File.expand_path('../../fixtures/id_token_bad_chash.txt', __dir__)) }
+        it { is_expected.to raise_error JWT::VerificationError }
+      end
     end
 
     context 'with a non-matching kid' do
-      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_kid.txt', __FILE__)) }
+      let(:id_token) { File.read(File.expand_path('../../fixtures/id_token_bad_kid.txt', __dir__)) }
       it { is_expected.to raise_error JWT::VerificationError }
-    end
-
-    context 'with no alg header' do
-      let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_no_alg.txt', __FILE__)) }
-
-      it 'should correctly parse using default RS256' do
-        expect(subject).to_not raise_error
-      end
-
-      describe 'the auth hash' do
-        subject { env['omniauth.auth'] }
-        before(:each) { strategy.callback_phase }
-
-        it 'should default to RS256' do
-          expect(subject.info['name']).to eq name
-        end
-      end
     end
   end
 
   describe '#request_phase' do
-    let(:strategy) { described_class.new(app, client_id, tenant) }
+    let(:strategy) do
+      described_class.new(app, base_config)
+    end
     subject { strategy.request_phase }
     before(:each) { strategy.call!(env) }
 
@@ -195,7 +209,7 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
   end
 
   describe '#read_nonce' do
-    let(:strategy) { described_class.new(app, client_id, tenant) }
+    let(:strategy) { described_class.new(app, base_config) }
     let(:env) { { 'rack.session' => {} } }
     before(:each) { strategy.call!(env) }
     subject { strategy.send(:read_nonce) }
