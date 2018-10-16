@@ -21,80 +21,95 @@
 #-------------------------------------------------------------------------------
 
 require 'jwt'
-require 'omniauth'
+require 'omniauth/strategies/oauth2'
 require 'openssl'
 require 'securerandom'
 
 module OmniAuth
   module Strategies
     # A strategy for authentication against Azure Active Directory.
-    class AzureActiveDirectory
+    # rubocop:disable Metrics/ClassLength
+    class AzureActiveDirectory < OmniAuth::Strategies::OAuth2
       include OmniAuth::AzureActiveDirectory
-      include OmniAuth::Strategy
 
-      class OAuthError < StandardError; end
+      BASE_SCOPES = %w[openid profile email].freeze
+      DEFAULT_RESPONSE_MODE = 'form_post'.freeze
+      DEFAULT_RESPONSE_TYPE = 'code id_token'.freeze
+      DEFAULT_TENANT = 'common'.freeze
 
-      ##
-      # The client id (key) and tenant must be configured when the OmniAuth
-      # middleware is installed. Example:
-      #
-      #    require 'omniauth'
-      #    require 'omniauth-azure-activedirectory'
-      #
-      #    use OmniAuth::Builder do
-      #      provider :azure_activedirectory, ENV['AAD_KEY'], ENV['AAD_TENANT']
-      #    end
-      #
-      args [:client_id, :tenant]
+      option :name, 'azure_activedirectory'
+
       option :client_id, nil
-      option :tenant, nil
+      option :client_secret, nil
+      option :response_mode, DEFAULT_RESPONSE_MODE
+      option :response_type, DEFAULT_RESPONSE_TYPE
+      option :scope, BASE_SCOPES.join(' ')
+      option :tenant, DEFAULT_TENANT
+      option :verify_iss, false
 
-      # Field renaming is an attempt to fit the OmniAuth recommended schema as
-      # best as possible.
-      #
-      # @see https://github.com/intridea/omniauth/wiki/Auth-Hash-Schema
-      uid { @claims['sub'] }
-      info do
-        { name: @claims['name'],
-          email: @claims['email'] || @claims['upn'],
-          first_name: @claims['given_name'],
-          last_name: @claims['family_name'] }
-      end
       credentials { { code: @code } }
+      uid { claims['sub'] }
+
+      info do
+        {
+          # Since name is not always present, default to oid because `name` is
+          # required for an auth_hash to be valid. The name should not be used
+          # for anything except display.
+          name: claims['name'] || claims['oid'],
+          # Email is only included in personal accounts requests. For sign-ins
+          # with an AD account, the preferred_username key might be an email,
+          # but not always; it could be a phone number or just a generic
+          # username.
+          email: claims['email'],
+          preferred_username: claims['preferred_username'],
+          oid: claims['oid'],
+          tid: claims['tid']
+        }
+      end
       extra do
         { session_state: @session_state,
           raw_info:
             { id_token: @id_token,
-              id_token_claims: @claims,
-              id_token_header: @header } }
+              id_token_claims: claims,
+              id_token_header: header } }
       end
 
-      DEFAULT_RESPONSE_TYPE = 'code id_token'
-      DEFAULT_RESPONSE_MODE = 'form_post'
+      uid { claims['sub'] }
 
-      ##
-      # Overridden method from OmniAuth::Strategy. This is the first step in the
-      # authentication process.
-      def request_phase
-        redirect authorize_endpoint_url
+      def client
+        options.client_options.authorize_url = URI(openid_config['authorization_endpoint'])
+        options.client_options.token_url = URI(openid_config['token_endpoint'])
+
+        super
       end
 
-      ##
-      # Overridden method from OmniAuth::Strategy. This is the second step in
-      # the authentication process. It is called after the user enters
-      # credentials at the authorization endpoint.
-      def callback_phase
-        error = request.params['error_reason'] || request.params['error']
-        fail(OAuthError, error) if error
-        @session_state = request.params['session_state']
-        @id_token = request.params['id_token']
-        @code = request.params['code']
-        @claims, @header = validate_and_parse_id_token(@id_token)
-        validate_chash(@code, @claims, @header)
+      def callback_url
+        full_host + script_name + callback_path
+      end
+
+      def authorize_params
+        options.authorize_params[:nonce] = new_nonce
+        options.authorize_params[:response_mode] = options.response_mode
+        options.authorize_params[:response_type] = options.response_type
+
         super
       end
 
       private
+
+      def claims
+        @claims ||= decoded_token[0]
+      end
+
+      def header
+        @header ||= decoded_token[1]
+      end
+
+      def decoded_token
+        @session_state = request.params['session_state']
+        @id_token = access_token.params['id_token']
+        @decoded_token ||= validate_and_parse_id_token(@id_token)
+      end
 
       ##
       # Constructs a one-time-use authorize_endpoint. This method will use
@@ -105,8 +120,6 @@ module OmniAuth
         uri = URI(openid_config['authorization_endpoint'])
         uri.query = URI.encode_www_form(client_id: client_id,
                                         redirect_uri: callback_url,
-                                        response_mode: response_mode,
-                                        response_type: response_type,
                                         nonce: new_nonce)
         uri.to_s
       end
@@ -118,15 +131,8 @@ module OmniAuth
       # @return String
       def client_id
         return options.client_id if options.client_id
-        fail StandardError, 'No client_id specified in AzureAD configuration.'
-      end
 
-      ##
-      # The expected id token issuer taken from the discovery endpoint.
-      #
-      # @return String
-      def issuer
-        openid_config['issuer']
+        raise StandardError, 'No client_id specified in AzureAD configuration.'
       end
 
       ##
@@ -166,10 +172,21 @@ module OmniAuth
       #
       # @return Hash
       def fetch_openid_config
-        JSON.parse(Net::HTTP.get(URI(openid_config_url)))
+        JSON.parse(
+          Net::HTTP.get(
+            URI(openid_config_url)
+          )
+        )
       rescue JSON::ParserError
         raise StandardError, 'Unable to fetch OpenId configuration for ' \
                              'AzureAD tenant.'
+      end
+
+      # The expected id token issuer taken from the discovery endpoint.
+      #
+      # @return String
+      def issuer
+        openid_config['issuer']
       end
 
       ##
@@ -195,7 +212,7 @@ module OmniAuth
       #
       # @return String
       def openid_config_url
-        "https://login.windows.net/#{tenant}/.well-known/openid-configuration"
+        "https://login.microsoftonline.com/#{options.tenant}/v2.0/.well-known/openid-configuration/"
       end
 
       ##
@@ -205,26 +222,6 @@ module OmniAuth
       # @return String
       def read_nonce
         session.delete('omniauth-azure-activedirectory.nonce')
-      end
-
-      ##
-      # The response_type that will be set in the authorization request query
-      # parameters. Can be overridden by the client, but it shouldn't need to
-      # be.
-      #
-      # @return String
-      def response_type
-        options[:response_type] || DEFAULT_RESPONSE_TYPE
-      end
-
-      ##
-      # The response_mode that will be set in the authorization request query
-      # parameters. Can be overridden by the client, but it shouldn't need to
-      # be.
-      #
-      # @return String
-      def response_mode
-        options[:response_mode] || DEFAULT_RESPONSE_MODE
       end
 
       ##
@@ -243,17 +240,8 @@ module OmniAuth
       # @return String
       def signing_keys_url
         return openid_config['jwks_uri'] if openid_config.include? 'jwks_uri'
-        fail StandardError, 'No jwks_uri in OpenId config response.'
-      end
 
-      ##
-      # The tenant of the calling application. Note that this must be
-      # explicitly configured when installing the AzureAD OmniAuth strategy.
-      #
-      # @return String
-      def tenant
-        return options.tenant if options.tenant
-        fail StandardError, 'No tenant specified in AzureAD configuration.'
+        raise StandardError, 'No jwks_uri in OpenId config response.'
       end
 
       ##
@@ -263,14 +251,11 @@ module OmniAuth
       # See OpenId Connect Core 3.1.3.7 and 3.2.2.11.
       #
       # @return Claims, Header
+      #
+      # rubocop:disable Metrics/MethodLength
+      # rubocop:disable Metrics/AbcSize
       def validate_and_parse_id_token(id_token)
-        # The second parameter is the public key to verify the signature.
-        # However, that key is overridden by the value of the executed block
-        # if one is present.
-        #
-        # If you're thinking that this looks ugly with the raw nil and boolean,
-        # see https://github.com/jwt/ruby-jwt/issues/59.
-        jwt_claims, jwt_header =
+        claims, token_header =
           JWT.decode(id_token, nil, true, verify_options) do |header|
             # There should always be one key from the discovery endpoint that
             # matches the id in the JWT header.
@@ -278,16 +263,22 @@ module OmniAuth
               key['kid'] == header['kid']
             end || {})['x5c']
             if x5c.nil? || x5c.empty?
-              fail JWT::VerificationError,
-                   'No keys from key endpoint match the id token'
+              raise JWT::VerificationError, 'No keys from key endpoint match the id token'
             end
+
             # The key also contains other fields, such as n and e, that are
             # redundant. x5c is sufficient to verify the id token.
             OpenSSL::X509::Certificate.new(JWT.base64url_decode(x5c.first)).public_key
           end
-        return jwt_claims, jwt_header if jwt_claims['nonce'] == read_nonce
-        fail JWT::DecodeError, 'Returned nonce did not match.'
+
+        @code = request.params['code']
+        validate_chash(@code, claims, token_header)
+        return claims, token_header if claims['nonce'] == read_nonce
+
+        raise JWT::DecodeError, 'Returned nonce did not match.'
       end
+      # rubocop:enable Metrics/MethodLength
+      # rubocop:enable Metrics/AbcSize
 
       ##
       # Verifies that the c_hash the id token claims matches the authorization
@@ -297,13 +288,15 @@ module OmniAuth
       # @param Hash claims
       # @param Hash header
       def validate_chash(code, claims, header)
+        return if claims['c_hash'].nil?
+
         # This maps RS256 -> sha256, ES384 -> sha384, etc.
         algorithm = (header['alg'] || 'RS256').sub(/RS|ES|HS/, 'sha')
         full_hash = OpenSSL::Digest.new(algorithm).digest code
         c_hash = JWT.base64url_encode full_hash[0..full_hash.length / 2 - 1]
         return if c_hash == claims['c_hash']
-        fail JWT::VerificationError,
-             'c_hash in id token does not match auth code.'
+
+        raise JWT::VerificationError, 'c_hash in id token does not match auth code.'
       end
 
       ##
@@ -314,15 +307,18 @@ module OmniAuth
       #
       # @return Hash
       def verify_options
-        { verify_expiration: true,
-          verify_not_before: true,
-          verify_iat: true,
-          verify_iss: true,
-          'iss' => issuer,
+        {
+          aud: client.id,
+          iss: issuer,
           verify_aud: true,
-          'aud' => client_id }
+          verify_expiration: true,
+          verify_iat: true,
+          verify_iss: options.verify_iss,
+          verify_not_before: true
+        }
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end
 
