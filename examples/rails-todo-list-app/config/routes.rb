@@ -18,5 +18,5 @@ Rails.application.routes.draw do
 
   # This is where we are redirected if OmniAuth fails to authenticate the user.
   # user
-  match '/auth/:provider/failure', to: redirect('/'), via: [:get, :post]
+  match '/auth/failure', to: redirect('/'), via: [:get, :post]
 end

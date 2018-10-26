@@ -45,7 +45,7 @@ end
 end
 
 %w(get post).each do |method|
-  send(method, '/auth/:provider/failure') do
+  send(method, '/auth/failure') do
     "Aw shucks, we couldn't verify your identity!"
   end
 end
