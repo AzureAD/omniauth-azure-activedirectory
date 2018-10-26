@@ -77,7 +77,7 @@ bundle exec thin start --port 9292 --ssl --ssl-key-file server.key --ssl-cert-fi
 If you want to skip SSL verification (shame!)
 
 ```
-bundle exec thing start --port 9292 --ssl --ssl-disable-verify
+bundle exec thin start --port 9292 --ssl --ssl-disable-verify
 ```
 
 You may now proceed to https://localhost:9292 to view the application. You may get a warning about the self-signed certificate. This is nothing to worry about, as in production you will not be using self-signed certs.
