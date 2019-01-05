@@ -159,7 +159,7 @@ module OmniAuth
           nonce: new_nonce
         }.to_a
         # preserve existing URL params
-        if uri.query.present?
+        if uri.query
           params += URI.decode_www_form(String(uri.query))
         end
         uri.query = URI.encode_www_form(params)
