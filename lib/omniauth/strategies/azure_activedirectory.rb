@@ -45,9 +45,10 @@ module OmniAuth
       #      provider :azure_activedirectory, ENV['AAD_KEY'], ENV['AAD_TENANT']
       #    end
       #
-      args [:client_id, :tenant]
+      args [:client_id, :tenant, :multi_tenant]
       option :client_id, nil
       option :tenant, nil
+      option :multi_tenant, false
 
       # Field renaming is an attempt to fit the OmniAuth recommended schema as
       # best as possible.
@@ -102,7 +103,11 @@ module OmniAuth
       #
       # @return String
       def authorize_endpoint_url
-        uri = URI(openid_config['authorization_endpoint'])
+        if !options.multi_tenant
+          uri = URI(openid_config['authorization_endpoint'])
+        else
+          uri = URI("https://login.windows.net/common/oauth2/authorize")
+        end
         uri.query = URI.encode_www_form(client_id: client_id,
                                         redirect_uri: callback_url,
                                         response_mode: response_mode,
@@ -314,13 +319,14 @@ module OmniAuth
       #
       # @return Hash
       def verify_options
-        { verify_expiration: true,
+        opt_hash = { verify_expiration: true,
           verify_not_before: true,
           verify_iat: true,
           verify_iss: true,
-          'iss' => issuer,
           verify_aud: true,
-          'aud' => client_id }
+          'aud' => client_id}
+          opt_hash.merge!('iss' => issuer) unless options.multi_tenant
+          return opt_hash
       end
     end
   end
