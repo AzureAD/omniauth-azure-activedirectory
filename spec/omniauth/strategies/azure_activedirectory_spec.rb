@@ -127,7 +127,8 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       #   { 'iss' => 'https://sts.imposter.net/bunch-of-random-chars', ... }
       #
       let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_issuer.txt', __FILE__)) }
-      it { is_expected.to raise_error JWT::InvalidIssuerError }
+      #it { is_expected.to raise_error JWT::InvalidIssuerError }
+      it { is_expected.to raise_error JWT::VerificationError }
     end
 
     context 'with an invalid audience' do
@@ -135,7 +136,8 @@ describe OmniAuth::Strategies::AzureActiveDirectory do
       #   { 'aud' => 'not the client id', ... }
       #
       let(:id_token) { File.read(File.expand_path('../../../fixtures/id_token_bad_audience.txt', __FILE__)) }
-      it { is_expected.to raise_error JWT::InvalidAudError }
+      #it { is_expected.to raise_error JWT::InvalidAudError }
+      it { is_expected.to raise_error JWT::VerificationError }
     end
 
     context 'with a non-matching nonce' do

@@ -32,8 +32,6 @@ module OmniAuth
       include OmniAuth::AzureActiveDirectory
       include OmniAuth::Strategy
 
-      class OAuthError < StandardError; end
-
       ##
       # The client id (key) and tenant must be configured when the OmniAuth
       # middleware is installed. Example:
@@ -48,6 +46,23 @@ module OmniAuth
       args [:client_id, :tenant]
       option :client_id, nil
       option :tenant, nil
+
+      # instead of hard coding client_id and tenant, you may pass a class that
+      # determines these values at runtime to support multiple tenants
+      option :tenant_provider, nil
+
+      # points to the openid discovery json document. may also be set by the
+      # tenant provider (just implement an openid_config_url method)
+      #
+      # Defaults to
+      # "https://login.windows.net/#{tenant}/.well-known/openid-configuration"
+      option :openid_config_url
+
+      # URL parameter(s) to be used with the authorize_endpoint_url for triggering
+      # display of the password reset page.may also be set by the
+      # tenant provider (just implement the reset_password_param method)
+      # This has to be a valid query string, i.e. "p=B2C_1_sipr"
+      option :reset_password_param
 
       # Field renaming is an attempt to fit the OmniAuth recommended schema as
       # best as possible.
@@ -73,6 +88,25 @@ module OmniAuth
       DEFAULT_RESPONSE_MODE = 'form_post'
 
       ##
+      # Overridden method from OmniAuth::Strategy. This is called before
+      # request_phase or callback_phase are called.
+      def setup_phase
+        if options.tenant_provider
+          provider = options.tenant_provider.new(self)
+          options.client_id = provider.client_id
+          options.tenant = provider.tenant_id
+          if provider.respond_to?(:openid_config_url)
+            options.openid_config_url = provider.openid_config_url
+          end
+          if provider.respond_to?(:reset_password_param)
+            options.reset_password_param = provider.reset_password_param
+          end
+        end
+
+        super
+      end
+
+      ##
       # Overridden method from OmniAuth::Strategy. This is the first step in the
       # authentication process.
       def request_phase
@@ -84,8 +118,20 @@ module OmniAuth
       # the authentication process. It is called after the user enters
       # credentials at the authorization endpoint.
       def callback_phase
-        error = request.params['error_reason'] || request.params['error']
-        fail(OAuthError, error) if error
+        if error = request.params['error_reason'] || request.params['error']
+
+          if error == 'access_denied' and
+            desc = request.params['error_description'] and
+            desc =~ /^AADB2C90118:/
+
+            return redirect reset_password_endpoint_url
+
+          else
+            return fail!(error) # invokes the configured on_failure handler and return its response
+          end
+
+        end
+
         @session_state = request.params['session_state']
         @id_token = request.params['id_token']
         @code = request.params['code']
@@ -96,6 +142,7 @@ module OmniAuth
 
       private
 
+
       ##
       # Constructs a one-time-use authorize_endpoint. This method will use
       # a new nonce on each invocation.
@@ -103,12 +150,40 @@ module OmniAuth
       # @return String
       def authorize_endpoint_url
         uri = URI(openid_config['authorization_endpoint'])
-        uri.query = URI.encode_www_form(client_id: client_id,
-                                        redirect_uri: callback_url,
-                                        response_mode: response_mode,
-                                        response_type: response_type,
-                                        nonce: new_nonce)
+        params = {
+          client_id: client_id,
+          scope: "openid",
+          redirect_uri: redirect_uri,
+          response_mode: response_mode,
+          response_type: response_type,
+          nonce: new_nonce
+        }.to_a
+        # preserve existing URL params
+        if uri.query
+          params += URI.decode_www_form(String(uri.query))
+        end
+        uri.query = URI.encode_www_form(params)
         uri.to_s
+      end
+
+      ##
+      # URL of the Azure password reset page
+      #
+      def reset_password_endpoint_url
+        if query_string = options["reset_password_param"]
+          uri = URI(authorize_endpoint_url)
+          reset_password_param = Hash[URI.decode_www_form(query_string)]
+          params = Hash[URI.decode_www_form(String(uri.query))]
+          params.update reset_password_param
+          uri.query = URI.encode_www_form params.to_a
+          uri.to_s
+        else
+          authorize_endpoint_url
+        end
+      end
+
+      def redirect_uri
+        options[:redirect_uri] || callback_url
       end
 
       ##
@@ -195,7 +270,8 @@ module OmniAuth
       #
       # @return String
       def openid_config_url
-        "https://login.windows.net/#{tenant}/.well-known/openid-configuration"
+        options[:openid_config_url] ||
+          "https://login.windows.net/#{tenant}/.well-known/openid-configuration"
       end
 
       ##
@@ -274,19 +350,48 @@ module OmniAuth
           JWT.decode(id_token, nil, true, verify_options) do |header|
             # There should always be one key from the discovery endpoint that
             # matches the id in the JWT header.
-            x5c = (signing_keys.find do |key|
-              key['kid'] == header['kid']
-            end || {})['x5c']
-            if x5c.nil? || x5c.empty?
-              fail JWT::VerificationError,
-                   'No keys from key endpoint match the id token'
+            unless key = signing_keys.find{|k|
+              k['kid'] == header['kid']
+            }
+              fail JWT::VerificationError, 'No keys from key endpoint match the id token'
             end
+
             # The key also contains other fields, such as n and e, that are
             # redundant. x5c is sufficient to verify the id token.
-            OpenSSL::X509::Certificate.new(JWT.base64url_decode(x5c.first)).public_key
+            if x5c = key['x5c'] and !x5c.empty?
+              OpenSSL::X509::Certificate.new(JWT::Decode.base64url_decode(x5c.first)).public_key
+            # no x5c, so we resort to e and n
+            elsif exp = key['e'] and mod = key['n']
+              key = OpenSSL::PKey::RSA.new
+              mod = openssl_bn_for mod
+              exp = openssl_bn_for exp
+              if key.respond_to? :set_key
+                # Ruby 2.4 ff
+                key.set_key mod, exp, nil
+              else
+                # Ruby < 2.4
+                key.e = exp
+                key.n = mod
+              end
+              key.public_key
+            else
+              fail JWT::VerificationError, 'Key has no info for verification'
+            end
           end
         return jwt_claims, jwt_header if jwt_claims['nonce'] == read_nonce
         fail JWT::DecodeError, 'Returned nonce did not match.'
+      end
+
+      def openssl_bn_for(s)
+        s.strip!
+        # Pad the string so its length is divisible by 4
+        # this is necessary only with Ruby < 2.3, from then on
+        # Base64.urlsafe_decode64 is clever enough to add the padding itself
+        if !s.end_with?("=") && s.length % 4 != 0
+          s = s.ljust((s.length + 3) & ~3, "=")
+        end
+        bytes = Base64.urlsafe_decode64 s
+        OpenSSL::BN.new bytes, 2
       end
 
       ##
@@ -300,7 +405,7 @@ module OmniAuth
         # This maps RS256 -> sha256, ES384 -> sha384, etc.
         algorithm = (header['alg'] || 'RS256').sub(/RS|ES|HS/, 'sha')
         full_hash = OpenSSL::Digest.new(algorithm).digest code
-        c_hash = JWT.base64url_encode full_hash[0..full_hash.length / 2 - 1]
+        c_hash = JWT::Encode.base64url_encode full_hash[0..full_hash.length / 2 - 1]
         return if c_hash == claims['c_hash']
         fail JWT::VerificationError,
              'c_hash in id token does not match auth code.'
@@ -315,6 +420,7 @@ module OmniAuth
       # @return Hash
       def verify_options
         { verify_expiration: true,
+          algorithms: %w(RS256),
           verify_not_before: true,
           verify_iat: true,
           verify_iss: true,
