@@ -138,7 +138,10 @@ module OmniAuth
       #
       # @return Array[Hash]
       def fetch_signing_keys
-        response = JSON.parse(Net::HTTP.get(URI(signing_keys_url)))
+        uri = URI(signing_keys_url)
+        http = Net::HTTP.new(uri.host, uri.port)
+        request = Net::HTTP::Get.new(uri.request_uri)
+        response = JSON.parse(http.request(request))
         response['keys']
       rescue JSON::ParserError
         raise StandardError, 'Unable to fetch AzureAD signing keys.'
@@ -166,7 +169,10 @@ module OmniAuth
       #
       # @return Hash
       def fetch_openid_config
-        JSON.parse(Net::HTTP.get(URI(openid_config_url)))
+        uri = URI(openid_config_url)
+        http = Net::HTTP.new(uri.host, uri.port)
+        request = Net::HTTP::Get.new(uri.request_uri)
+        JSON.parse(http.request(request))
       rescue JSON::ParserError
         raise StandardError, 'Unable to fetch OpenId configuration for ' \
                              'AzureAD tenant.'
