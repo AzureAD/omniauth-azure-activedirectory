@@ -159,9 +159,7 @@ module OmniAuth
           nonce: new_nonce
         }.to_a
         # preserve existing URL params
-        if uri.query
-          params += URI.decode_www_form(String(uri.query))
-        end
+        params += URI.decode_www_form(String(uri.query)) if uri.query
         uri.query = URI.encode_www_form(params)
         uri.to_s
       end
@@ -184,6 +182,10 @@ module OmniAuth
 
       def redirect_uri
         options[:redirect_uri] || callback_url
+      end
+
+      def callback_url
+        full_host + script_name + callback_path
       end
 
       ##
