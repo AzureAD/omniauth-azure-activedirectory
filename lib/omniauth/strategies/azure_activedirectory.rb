@@ -361,7 +361,7 @@ module OmniAuth
             # The key also contains other fields, such as n and e, that are
             # redundant. x5c is sufficient to verify the id token.
             if x5c = key['x5c'] and !x5c.empty?
-              OpenSSL::X509::Certificate.new(JWT::Decode.base64url_decode(x5c.first)).public_key
+              OpenSSL::X509::Certificate.new(JWT::Base64::url_decode(x5c.first)).public_key
             # no x5c, so we resort to e and n
             elsif exp = key['e'] and mod = key['n']
               key = OpenSSL::PKey::RSA.new
@@ -407,7 +407,7 @@ module OmniAuth
         # This maps RS256 -> sha256, ES384 -> sha384, etc.
         algorithm = (header['alg'] || 'RS256').sub(/RS|ES|HS/, 'sha')
         full_hash = OpenSSL::Digest.new(algorithm).digest code
-        c_hash = JWT::Encode.base64url_encode full_hash[0..full_hash.length / 2 - 1]
+        c_hash = JWT::Base64::url_encode full_hash[0..full_hash.length / 2 - 1]
         return if c_hash == claims['c_hash']
         fail JWT::VerificationError,
              'c_hash in id token does not match auth code.'
