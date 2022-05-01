@@ -44,7 +44,7 @@ bundle
 rake db:schema:load
 ```
 
-Note: Depending on your host environment, you may need to install a Javascript runtime. We suggest Node.js. Installation will differ by platform.
+Note: Depending on your host environment, you may need to install a JavaScript runtime. We suggest Node.js. Installation will differ by platform.
 
 ### Step 5 - Configure the app
 
