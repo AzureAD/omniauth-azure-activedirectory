@@ -15,7 +15,7 @@ Gem::Specification.new do |s|
   s.require_paths   = ['lib']
 
   s.add_runtime_dependency 'jwt', '~> 1.5'
-  s.add_runtime_dependency 'omniauth', '~> 1.1'
+  s.add_runtime_dependency 'omniauth', '~> 2.0'
 
   s.add_development_dependency 'rake', '~> 10.4'
   s.add_development_dependency 'rspec', '~> 3.3'

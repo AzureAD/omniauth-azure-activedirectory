@@ -28,7 +28,7 @@ require 'securerandom'
 module OmniAuth
   module Strategies
     # A strategy for authentication against Azure Active Directory.
-    class AzureActiveDirectory
+    class Azureactivedirectory
       include OmniAuth::AzureActiveDirectory
       include OmniAuth::Strategy
 
